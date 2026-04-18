@@ -159,8 +159,8 @@
       "id": "gen-opener",
       "credentials": {
         "openAiApi": {
-          "id": "REPLACE_WITH_OPENAI_CRED_ID",
-          "name": "OpenAI (n8n built-in)"
+          "id": "TCLXIBfS0vNSGyPJ",
+          "name": "n8n free OpenAI API credits"
         }
       }
     },
