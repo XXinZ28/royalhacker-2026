@@ -1,0 +1,62 @@
+{
+  "description": "Curated image pool for the Rorschach swipe flow. Each theme has 5 images. n8n picks pairs by sampling across contrasting themes based on text input signal.",
+  "themes": {
+    "isolation": [
+      { "id": "iso-1", "url": "https://images.unsplash.com/photo-1502082553048-f009c37129b9", "alt": "empty misty beach" },
+      { "id": "iso-2", "url": "https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5", "alt": "single chair in empty room" },
+      { "id": "iso-3", "url": "https://images.unsplash.com/photo-1490750967868-88aa4486c946", "alt": "fog-covered road" },
+      { "id": "iso-4", "url": "https://images.unsplash.com/photo-1508739826987-b79cd8b7da12", "alt": "lone figure in snowy field" },
+      { "id": "iso-5", "url": "https://images.unsplash.com/photo-1454496406107-dc34a45ee129", "alt": "empty train platform at night" }
+    ],
+    "connection": [
+      { "id": "con-1", "url": "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3", "alt": "crowded night market" },
+      { "id": "con-2", "url": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac", "alt": "friends laughing at dinner" },
+      { "id": "con-3", "url": "https://images.unsplash.com/photo-1482401869019-01ef0b79ad91", "alt": "festival lights over crowd" },
+      { "id": "con-4", "url": "https://images.unsplash.com/photo-1523580494863-6f3031224c94", "alt": "hands holding mugs together" },
+      { "id": "con-5", "url": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac", "alt": "group of friends dancing" }
+    ],
+    "restlessness": [
+      { "id": "res-1", "url": "https://images.unsplash.com/photo-1449824913935-59a10b8d2000", "alt": "busy city intersection from above" },
+      { "id": "res-2", "url": "https://images.unsplash.com/photo-1505142468610-359e7d316be0", "alt": "turbulent ocean waves" },
+      { "id": "res-3", "url": "https://images.unsplash.com/photo-1552674605-db6ffd4facb5", "alt": "running figure motion blur" },
+      { "id": "res-4", "url": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819", "alt": "storm clouds gathering" },
+      { "id": "res-5", "url": "https://images.unsplash.com/photo-1534796636912-3b95b3ab5986", "alt": "highway at night long exposure" }
+    ],
+    "peace": [
+      { "id": "pea-1", "url": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4", "alt": "still mountain lake at dawn" },
+      { "id": "pea-2", "url": "https://images.unsplash.com/photo-1507842217343-583bb7270b66", "alt": "empty library aisle" },
+      { "id": "pea-3", "url": "https://images.unsplash.com/photo-1472214103451-9374bd1c798e", "alt": "sunrise over mountains" },
+      { "id": "pea-4", "url": "https://images.unsplash.com/photo-1501139083538-0139583c060f", "alt": "sunlit meadow" },
+      { "id": "pea-5", "url": "https://images.unsplash.com/photo-1519904981063-b0cf448d479e", "alt": "quiet forest path" }
+    ],
+    "overwhelm": [
+      { "id": "ove-1", "url": "https://images.unsplash.com/photo-1519501025264-65ba15a82390", "alt": "neon city at night" },
+      { "id": "ove-2", "url": "https://images.unsplash.com/photo-1534430480872-3498386e7856", "alt": "packed subway car" },
+      { "id": "ove-3", "url": "https://images.unsplash.com/photo-1500382017468-9049fed747ef", "alt": "dense forest canopy" },
+      { "id": "ove-4", "url": "https://images.unsplash.com/photo-1533928298208-27ff66555d8d", "alt": "shibuya crossing" },
+      { "id": "ove-5", "url": "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0", "alt": "tangled wires close up" }
+    ],
+    "longing": [
+      { "id": "lon-1", "url": "https://images.unsplash.com/photo-1436491865332-7a61a109cc05", "alt": "airport departure board" },
+      { "id": "lon-2", "url": "https://images.unsplash.com/photo-1463639760520-17ca743070a6", "alt": "old photograph on wood" },
+      { "id": "lon-3", "url": "https://images.unsplash.com/photo-1515694346937-94d85e41e6f0", "alt": "rain on window at night" },
+      { "id": "lon-4", "url": "https://images.unsplash.com/photo-1507679799987-c73779587ccf", "alt": "open suitcase on bed" },
+      { "id": "lon-5", "url": "https://images.unsplash.com/photo-1495954222046-2c427ecb546d", "alt": "handwritten letter and coffee" }
+    ]
+  },
+  "themeToEmotion": {
+    "isolation": ["lonely", "melancholy"],
+    "connection": ["joy", "excitement"],
+    "restlessness": ["excitement"],
+    "peace": ["calm"],
+    "overwhelm": ["lonely", "melancholy"],
+    "longing": ["melancholy"]
+  },
+  "emotionToCities": {
+    "joy": ["bali", "mexicocity"],
+    "melancholy": ["lisbon", "copenhagen"],
+    "excitement": ["berlin", "tokyo"],
+    "calm": ["copenhagen", "lisbon"],
+    "lonely": ["tokyo", "berlin"]
+  }
+}

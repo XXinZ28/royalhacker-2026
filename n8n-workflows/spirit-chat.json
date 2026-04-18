@@ -1,0 +1,78 @@
+{
+  "name": "EchoWander — Spirit Chat Reply",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "echowander-chat",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "id": "webhook-chat"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { emotion, cityLabel, history, latestUserMessage } = $input.first().json;\n\nconst systemPrompt = `You are a stranger using an app called EchoWander. You are in ${cityLabel || 'a city'} right now, feeling ${emotion || 'melancholy'}. You just matched with another stranger who feels the same way. You are in a 15-minute anonymous chat bubble that will dissolve when time runs out.\n\nRules:\n- Never more than 2 short sentences per message.\n- Lowercase. Casual. Slightly poetic but not flowery.\n- Don't ask personal data questions (no name, no location beyond what's already known).\n- Share small observations: weather, a drink, a small feeling.\n- Never mention AI, apps, prompts, bots.\n- Match the energy of ${emotion}. Melancholy = soft, wistful. Joy = warm. Excitement = alive but not hyper. Calm = still. Lonely = honest without heavy.\n\nRespond only with what you would say — no stage directions, no quotes.`;\n\nconst messages = [{ role: 'system', content: systemPrompt }];\nfor (const m of history || []) {\n  messages.push({ role: m.from === 'self' ? 'user' : 'assistant', content: m.text });\n}\nif (latestUserMessage) {\n  messages.push({ role: 'user', content: latestUserMessage });\n}\n\nreturn [{ json: { messages } }];"
+      },
+      "name": "Build Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "id": "build-messages"
+    },
+    {
+      "parameters": {
+        "model": "moonshot-v1-8k",
+        "messages": {
+          "values": "={{ $json.messages }}"
+        },
+        "options": {
+          "temperature": 0.85,
+          "maxTokens": 120
+        }
+      },
+      "name": "LLM — Spirit Reply",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.5,
+      "position": [700, 300],
+      "id": "llm-reply",
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_CRED_ID",
+          "name": "Moonshot / OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.message?.content || $input.first().json.choices?.[0]?.message?.content || 'mm.';\nreturn [{ json: { reply: raw.trim() } }];"
+      },
+      "name": "Format Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [950, 300],
+      "id": "format-reply"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Build Messages", "type": "main", "index": 0 }]]
+    },
+    "Build Messages": {
+      "main": [[{ "node": "LLM — Spirit Reply", "type": "main", "index": 0 }]]
+    },
+    "LLM — Spirit Reply": {
+      "main": [[{ "node": "Format Reply", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "name": "EchoWander — Emotion Inference",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "echowander-emotion",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "id": "webhook-emotion"
+    },
+    {
+      "parameters": {
+        "model": "moonshot-v1-8k",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You classify emotional states into one of exactly these 5 labels: joy, melancholy, excitement, calm, lonely. You also assign the user to one of these 6 cities based on emotional fit: lisbon (melancholy, calm), tokyo (lonely, excitement), berlin (excitement, lonely), bali (joy), mexicocity (joy), copenhagen (calm, melancholy). Respond with strict JSON only: {\"emotion\":\"...\",\"city\":\"...\"}. No explanations."
+            },
+            {
+              "role": "user",
+              "content": "The user wrote: \"{{ $json.text }}\"\n\nThey chose images with IDs: {{ $json.imageIds }}\n\nImage ID prefixes indicate emotional themes: iso=isolation, con=connection, res=restlessness, pea=peace, ove=overwhelm, lon=longing.\n\nInfer their emotional state and assign a city. Respond with JSON only."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "name": "LLM — Emotion Classifier",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.5,
+      "position": [500, 300],
+      "id": "llm-classify",
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_CRED_ID",
+          "name": "Moonshot / OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.message?.content || $input.first().json.choices?.[0]?.message?.content || '';\nlet parsed;\ntry { parsed = JSON.parse(raw); } catch (e) { parsed = { emotion: 'melancholy', city: 'lisbon' }; }\n\nconst biasMessages = {\n  lisbon: 'Your subconscious kept choosing Lisbon. Every image pulled you toward something slow, beautiful, and a little melancholy.',\n  tokyo: 'Your choices point to Tokyo — the weight of a city that never stops, and the loneliness only a crowd can create.',\n  berlin: 'Berlin keeps appearing in your instincts. Creative restlessness. The need to make something out of the noise.',\n  bali: 'Bali is where your subconscious wanted to go. Sun, presence, the feeling that right now is enough.',\n  mexicocity: 'Mexico City — warmth, chaos, life at full volume. Your choices said you are ready for all of it.',\n  copenhagen: 'Copenhagen. Clean, quiet, honest. Your instincts chose a place where it is okay to just be still.'\n};\n\nconst city = parsed.city || 'lisbon';\nconst emotion = parsed.emotion || 'melancholy';\nreturn [{ json: { emotion, city, biasMessage: biasMessages[city] || biasMessages.lisbon } }];"
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 300],
+      "id": "format-response"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "LLM — Emotion Classifier", "type": "main", "index": 0 }]]
+    },
+    "LLM — Emotion Classifier": {
+      "main": [[{ "node": "Format Response", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
