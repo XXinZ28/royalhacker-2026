@@ -1,0 +1,73 @@
+{
+  "bucket_id": 4,
+  "name": "Alert",
+  "center": { "P": 0.0, "A": 0.7 },
+  "images": [
+    {
+      "image_url": "https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 4,
+      "round": 1,
+      "theme": "color",
+      "choice_type": "warm",
+      "p_delta": 0.20,
+      "a_delta": 0.15,
+      "alt": "warm highway at night, long exposure",
+      "photographer_credit": "Unsplash photo-1534796636912-3b95b3ab5986"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 4,
+      "round": 1,
+      "theme": "color",
+      "choice_type": "cold",
+      "p_delta": -0.20,
+      "a_delta": -0.15,
+      "alt": "cold busy city intersection from above",
+      "photographer_credit": "Unsplash photo-1449824913935-59a10b8d2000"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1501139083538-0139583c060f?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 4,
+      "round": 2,
+      "theme": "nature",
+      "choice_type": "sunny",
+      "p_delta": 0.25,
+      "a_delta": 0.10,
+      "alt": "bright sunlit meadow",
+      "photographer_credit": "Unsplash photo-1501139083538-0139583c060f"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 4,
+      "round": 2,
+      "theme": "nature",
+      "choice_type": "stormy",
+      "p_delta": -0.25,
+      "a_delta": 0.20,
+      "alt": "turbulent ocean waves",
+      "photographer_credit": "Unsplash photo-1505142468610-359e7d316be0"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1533928298208-27ff66555d8d?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 4,
+      "round": 3,
+      "theme": "space",
+      "choice_type": "vast",
+      "p_delta": -0.10,
+      "a_delta": -0.20,
+      "alt": "shibuya crossing from above, many small figures",
+      "photographer_credit": "Unsplash photo-1533928298208-27ff66555d8d"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 4,
+      "round": 3,
+      "theme": "space",
+      "choice_type": "close",
+      "p_delta": 0.15,
+      "a_delta": 0.10,
+      "alt": "running figure, motion blur, close framing",
+      "photographer_credit": "Unsplash photo-1552674605-db6ffd4facb5"
+    }
+  ]
+}

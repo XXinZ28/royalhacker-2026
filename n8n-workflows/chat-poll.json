@@ -1,0 +1,65 @@
+{
+  "name": "Chat-Poll",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "chat-poll",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "id": "chat-poll-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": "chat_messages",
+        "options": {}
+      },
+      "name": "Read Messages",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [450, 300],
+      "id": "read-msgs",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CRED_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const q = $('Webhook').first().json.query || {};\nconst match_pair_id = String(q.match_pair_id || '').trim();\nconst since = q.since ? Date.parse(q.since) : 0;\n\nif (!match_pair_id) throw new Error('match_pair_id required');\n\nconst rows = $input.all().map(i => i.json);\nconst filtered = rows.filter(r => {\n  if (String(r.match_pair_id) !== match_pair_id) return false;\n  const ts = r.timestamp ? Date.parse(r.timestamp) : 0;\n  return ts > since;\n});\nfiltered.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));\n\nreturn [{ json: { messages: filtered } }];"
+      },
+      "name": "Filter & Sort",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300],
+      "id": "filter-sort"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Read Messages", "type": "main", "index": 0 }]]
+    },
+    "Read Messages": {
+      "main": [[{ "node": "Filter & Sort", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

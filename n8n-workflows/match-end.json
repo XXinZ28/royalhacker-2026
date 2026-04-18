@@ -1,0 +1,86 @@
+{
+  "name": "Match-End",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "match-end",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "id": "match-end-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || $input.first().json;\nconst session_id = String(b.session_id || '').trim();\nconst partner_session_id = String(b.partner_session_id || '').trim();\nif (!session_id || !partner_session_id) {\n  throw new Error('session_id and partner_session_id required');\n}\nconst ended_at = new Date().toISOString();\nreturn [\n  { json: { session_id, match_ended_at: ended_at } },\n  { json: { session_id: partner_session_id, match_ended_at: ended_at } }\n];"
+      },
+      "name": "Build Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "id": "build-rows"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": "user_vectors",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["session_id"],
+          "value": {
+            "session_id": "={{ $json.session_id }}",
+            "match_ended_at": "={{ $json.match_ended_at }}"
+          }
+        },
+        "options": {}
+      },
+      "name": "Update Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [700, 300],
+      "id": "update-sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CRED_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true } }];"
+      },
+      "name": "Respond",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [950, 300],
+      "id": "respond"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Build Rows", "type": "main", "index": 0 }]]
+    },
+    "Build Rows": {
+      "main": [[{ "node": "Update Sheet", "type": "main", "index": 0 }]]
+    },
+    "Update Sheet": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,221 @@
+{
+  "name": "Emotion-Match",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "emotion-match",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "id": "match-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": "user_vectors",
+        "options": {}
+      },
+      "name": "Read All Users",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [450, 300],
+      "id": "read-users",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CRED_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body || $('Webhook').first().json;\nconst me = {\n  session_id: String(body.session_id || ''),\n  final_P: Number(body.final_P),\n  final_A: Number(body.final_A),\n  final_D: Number(body.final_D)\n};\n\nif (!me.session_id) throw new Error('session_id required');\n\nconst rows = $input.all().map(i => i.json);\nconst now = Date.now();\nconst THIRTY_MIN = 30 * 60 * 1000;\n\nfunction isEligible(r) {\n  if (String(r.session_id) === me.session_id) return false;\n  if (Number(r.final_D) !== me.final_D) return false;\n  const matched = String(r.matched_user_id || '').trim();\n  const ended = String(r.match_ended_at || '').trim();\n  if (!matched) return true;\n  if (ended) return true;\n  const mt = r.match_timestamp ? Date.parse(r.match_timestamp) : 0;\n  if (mt && (now - mt) > THIRTY_MIN) return true;\n  return false;\n}\n\nconst candidates = rows.filter(isEligible).map(r => ({\n  session_id: String(r.session_id),\n  final_P: Number(r.final_P),\n  final_A: Number(r.final_A),\n  final_D: Number(r.final_D),\n  timestamp: r.timestamp ? Date.parse(r.timestamp) : 0,\n  dist: Math.sqrt(Math.pow(me.final_P - Number(r.final_P), 2) + Math.pow(me.final_A - Number(r.final_A), 2))\n}));\n\ncandidates.sort((x, y) => (x.dist - y.dist) || (x.timestamp - y.timestamp));\n\nconst partner = candidates[0];\nconst match_timestamp = new Date().toISOString();\nconst match_pair_id = partner ? [me.session_id, partner.session_id].sort().join('__') : '';\n\nreturn [{\n  json: {\n    me,\n    partner: partner || null,\n    matched: !!partner,\n    match_timestamp,\n    match_pair_id\n  }\n}];"
+      },
+      "name": "Pick Partner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300],
+      "id": "pick-partner"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.matched }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Matched?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [950, 300],
+      "id": "if-matched"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": "user_vectors",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["session_id"],
+          "value": {
+            "session_id": "={{ $json.me.session_id }}",
+            "matched_user_id": "={{ $json.partner.session_id }}",
+            "match_timestamp": "={{ $json.match_timestamp }}",
+            "match_ended_at": ""
+          }
+        },
+        "options": {}
+      },
+      "name": "Update Me",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1200, 200],
+      "id": "update-me",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CRED_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": "user_vectors",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["session_id"],
+          "value": {
+            "session_id": "={{ $json.partner.session_id }}",
+            "matched_user_id": "={{ $json.me.session_id }}",
+            "match_timestamp": "={{ $json.match_timestamp }}",
+            "match_ended_at": ""
+          }
+        },
+        "options": {}
+      },
+      "name": "Update Partner",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1200, 400],
+      "id": "update-partner",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CRED_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-5-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You generate a single short opener line for two strangers matched in an anonymous 15-minute chat based on their emotional vectors.\n\nRules:\n- 1 sentence, under 20 words.\n- Lowercase. Warm but not performative. No emojis.\n- Don't name emotions. Don't mention the app.\n- The opener should land in the emotional quadrant both users share."
+            },
+            {
+              "role": "user",
+              "content": "User A: P={{ $json.me.final_P }}, A={{ $json.me.final_A }}, D={{ $json.me.final_D }}\nUser B: P={{ $json.partner.final_P }}, A={{ $json.partner.final_A }}, D={{ $json.partner.final_D }}\n\nWrite one opener line."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.8,
+          "maxTokens": 60
+        }
+      },
+      "name": "Generate Opener",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.5,
+      "position": [1450, 300],
+      "id": "gen-opener",
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_OPENAI_CRED_ID",
+          "name": "OpenAI (n8n built-in)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const match = $('Pick Partner').first().json;\nconst raw = $input.first().json;\nconst opener = raw.message?.content || raw.choices?.[0]?.message?.content || raw.text || 'hi. glad you\\'re here.';\n\nreturn [{ json: {\n  matched: true,\n  partner_session_id: match.partner.session_id,\n  match_timestamp: match.match_timestamp,\n  match_pair_id: match.match_pair_id,\n  opener: opener.trim()\n} }];"
+      },
+      "name": "Format Matched Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1700, 300],
+      "id": "fmt-matched"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { matched: false, message: 'you are the first one here right now. please wait.' } }];"
+      },
+      "name": "No-Match Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 600],
+      "id": "no-match"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Read All Users", "type": "main", "index": 0 }]]
+    },
+    "Read All Users": {
+      "main": [[{ "node": "Pick Partner", "type": "main", "index": 0 }]]
+    },
+    "Pick Partner": {
+      "main": [[{ "node": "Matched?", "type": "main", "index": 0 }]]
+    },
+    "Matched?": {
+      "main": [
+        [
+          { "node": "Update Me", "type": "main", "index": 0 },
+          { "node": "Update Partner", "type": "main", "index": 0 }
+        ],
+        [{ "node": "No-Match Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Me": {
+      "main": [[{ "node": "Generate Opener", "type": "main", "index": 0 }]]
+    },
+    "Update Partner": {
+      "main": [[{ "node": "Generate Opener", "type": "main", "index": 0 }]]
+    },
+    "Generate Opener": {
+      "main": [[{ "node": "Format Matched Response", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

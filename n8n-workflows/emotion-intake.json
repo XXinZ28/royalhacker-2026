@@ -1,0 +1,82 @@
+{
+  "name": "Emotion-Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "emotion-intake",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "id": "intake-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || $input.first().json;\n\nfunction num(v, d) {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : d;\n}\n\nconst pDeltas = Array.isArray(b.p_deltas) ? b.p_deltas.map(Number).filter(Number.isFinite) : [];\nconst aDeltas = Array.isArray(b.a_deltas) ? b.a_deltas.map(Number).filter(Number.isFinite) : [];\n\nconst avg = arr => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : 0;\n\nconst initial_P = num(b.initial_P, 0);\nconst initial_A = num(b.initial_A, 0);\nconst final_D = num(b.final_D, 0);\n\n// final_X = initial_X + avg(3 deltas) * 0.5\nconst final_P = +(initial_P + avg(pDeltas) * 0.5).toFixed(4);\nconst final_A = +(initial_A + avg(aDeltas) * 0.5).toFixed(4);\n\nconst row = {\n  session_id: String(b.session_id || ''),\n  timestamp: new Date().toISOString(),\n  initial_P,\n  initial_A,\n  final_P,\n  final_A,\n  final_D,\n  matched_user_id: '',\n  match_timestamp: '',\n  match_ended_at: ''\n};\n\nif (!row.session_id) {\n  throw new Error('session_id is required');\n}\n\nreturn [{ json: row }];"
+      },
+      "name": "Compute Vector",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "id": "compute-vector"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": "user_vectors",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "name": "Append to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [700, 300],
+      "id": "append-sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CRED_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $('Compute Vector').first().json;\nreturn [{ json: { ok: true, session_id: row.session_id, final_P: row.final_P, final_A: row.final_A, final_D: row.final_D } }];"
+      },
+      "name": "Respond",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [950, 300],
+      "id": "respond"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Compute Vector", "type": "main", "index": 0 }]]
+    },
+    "Compute Vector": {
+      "main": [[{ "node": "Append to Sheet", "type": "main", "index": 0 }]]
+    },
+    "Append to Sheet": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

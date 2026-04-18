@@ -1,0 +1,73 @@
+{
+  "bucket_id": 9,
+  "name": "Depressed",
+  "center": { "P": -0.7, "A": -0.7 },
+  "images": [
+    {
+      "image_url": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 9,
+      "round": 1,
+      "theme": "color",
+      "choice_type": "warm",
+      "p_delta": 0.20,
+      "a_delta": 0.15,
+      "alt": "warm open suitcase on bed, melancholy light",
+      "photographer_credit": "Unsplash photo-1507679799987-c73779587ccf"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1508739826987-b79cd8b7da12?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 9,
+      "round": 1,
+      "theme": "color",
+      "choice_type": "cold",
+      "p_delta": -0.20,
+      "a_delta": -0.15,
+      "alt": "cold lone figure in snowy field",
+      "photographer_credit": "Unsplash photo-1508739826987-b79cd8b7da12"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 9,
+      "round": 2,
+      "theme": "nature",
+      "choice_type": "sunny",
+      "p_delta": 0.25,
+      "a_delta": 0.10,
+      "alt": "pale muted dawn over still lake",
+      "photographer_credit": "Unsplash photo-1506905925346-21bda4d32df4"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 9,
+      "round": 2,
+      "theme": "nature",
+      "choice_type": "stormy",
+      "p_delta": -0.25,
+      "a_delta": 0.20,
+      "alt": "heavy rain on dark window at night",
+      "photographer_credit": "Unsplash photo-1515694346937-94d85e41e6f0"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 9,
+      "round": 3,
+      "theme": "space",
+      "choice_type": "vast",
+      "p_delta": -0.10,
+      "a_delta": -0.20,
+      "alt": "empty misty beach, no figure",
+      "photographer_credit": "Unsplash photo-1502082553048-f009c37129b9"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 9,
+      "round": 3,
+      "theme": "space",
+      "choice_type": "close",
+      "p_delta": 0.15,
+      "a_delta": 0.10,
+      "alt": "single chair in empty room, close framing",
+      "photographer_credit": "Unsplash photo-1418065460487-3e41a6c84dc5"
+    }
+  ]
+}

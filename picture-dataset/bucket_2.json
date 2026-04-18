@@ -1,0 +1,73 @@
+{
+  "bucket_id": 2,
+  "name": "Content",
+  "center": { "P": 0.7, "A": 0.0 },
+  "images": [
+    {
+      "image_url": "https://images.unsplash.com/photo-1501139083538-0139583c060f?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 2,
+      "round": 1,
+      "theme": "color",
+      "choice_type": "warm",
+      "p_delta": 0.20,
+      "a_delta": 0.15,
+      "alt": "sunlit meadow",
+      "photographer_credit": "Unsplash photo-1501139083538-0139583c060f"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 2,
+      "round": 1,
+      "theme": "color",
+      "choice_type": "cold",
+      "p_delta": -0.20,
+      "a_delta": -0.15,
+      "alt": "still mountain lake at cold dawn",
+      "photographer_credit": "Unsplash photo-1506905925346-21bda4d32df4"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 2,
+      "round": 2,
+      "theme": "nature",
+      "choice_type": "sunny",
+      "p_delta": 0.25,
+      "a_delta": 0.10,
+      "alt": "soft sunrise over mountains",
+      "photographer_credit": "Unsplash photo-1472214103451-9374bd1c798e"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 2,
+      "round": 2,
+      "theme": "nature",
+      "choice_type": "stormy",
+      "p_delta": -0.25,
+      "a_delta": 0.20,
+      "alt": "storm clouds gathering",
+      "photographer_credit": "Unsplash photo-1514525253161-7a46d19cd819"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1519904981063-b0cf448d479e?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 2,
+      "round": 3,
+      "theme": "space",
+      "choice_type": "vast",
+      "p_delta": -0.10,
+      "a_delta": -0.20,
+      "alt": "quiet forest path stretching away",
+      "photographer_credit": "Unsplash photo-1519904981063-b0cf448d479e"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 2,
+      "round": 3,
+      "theme": "space",
+      "choice_type": "close",
+      "p_delta": 0.15,
+      "a_delta": 0.10,
+      "alt": "hands holding warm mugs together",
+      "photographer_credit": "Unsplash photo-1523580494863-6f3031224c94"
+    }
+  ]
+}

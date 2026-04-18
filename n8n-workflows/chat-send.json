@@ -1,0 +1,82 @@
+{
+  "name": "Chat-Send",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chat-send",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "id": "chat-send-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || $input.first().json;\nconst match_pair_id = String(b.match_pair_id || '').trim();\nconst from_session_id = String(b.from_session_id || '').trim();\nconst text = String(b.text || '').trim();\nif (!match_pair_id || !from_session_id || !text) {\n  throw new Error('match_pair_id, from_session_id, text all required');\n}\nreturn [{ json: {\n  message_id: crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2, 10)),\n  match_pair_id,\n  from_session_id,\n  text: text.slice(0, 1000),\n  timestamp: new Date().toISOString()\n} }];"
+      },
+      "name": "Build Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "id": "build-row"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": "chat_messages",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "name": "Append Message",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [700, 300],
+      "id": "append-msg",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CRED_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true, message_id: $('Build Row').first().json.message_id } }];"
+      },
+      "name": "Respond",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [950, 300],
+      "id": "respond"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Build Row", "type": "main", "index": 0 }]]
+    },
+    "Build Row": {
+      "main": [[{ "node": "Append Message", "type": "main", "index": 0 }]]
+    },
+    "Append Message": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

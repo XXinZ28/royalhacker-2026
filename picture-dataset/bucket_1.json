@@ -1,0 +1,73 @@
+{
+  "bucket_id": 1,
+  "name": "Ecstatic",
+  "center": { "P": 0.7, "A": 0.7 },
+  "images": [
+    {
+      "image_url": "https://images.unsplash.com/photo-1482401869019-01ef0b79ad91?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 1,
+      "round": 1,
+      "theme": "color",
+      "choice_type": "warm",
+      "p_delta": 0.20,
+      "a_delta": 0.15,
+      "alt": "festival lights over crowd",
+      "photographer_credit": "Unsplash photo-1482401869019-01ef0b79ad91"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 1,
+      "round": 1,
+      "theme": "color",
+      "choice_type": "cold",
+      "p_delta": -0.20,
+      "a_delta": -0.15,
+      "alt": "cold neon city at night",
+      "photographer_credit": "Unsplash photo-1519501025264-65ba15a82390"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 1,
+      "round": 2,
+      "theme": "nature",
+      "choice_type": "sunny",
+      "p_delta": 0.25,
+      "a_delta": 0.10,
+      "alt": "sunrise over mountains",
+      "photographer_credit": "Unsplash photo-1472214103451-9374bd1c798e"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 1,
+      "round": 2,
+      "theme": "nature",
+      "choice_type": "stormy",
+      "p_delta": -0.25,
+      "a_delta": 0.20,
+      "alt": "gathering storm clouds",
+      "photographer_credit": "Unsplash photo-1514525253161-7a46d19cd819"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 1,
+      "round": 3,
+      "theme": "space",
+      "choice_type": "vast",
+      "p_delta": -0.10,
+      "a_delta": -0.20,
+      "alt": "highway at night, long exposure",
+      "photographer_credit": "Unsplash photo-1534796636912-3b95b3ab5986"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 1,
+      "round": 3,
+      "theme": "space",
+      "choice_type": "close",
+      "p_delta": 0.15,
+      "a_delta": 0.10,
+      "alt": "friends laughing at dinner, close up",
+      "photographer_credit": "Unsplash photo-1529156069898-49953e39b3ac"
+    }
+  ]
+}

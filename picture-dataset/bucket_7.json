@@ -1,0 +1,73 @@
+{
+  "bucket_id": 7,
+  "name": "Anxious",
+  "center": { "P": -0.7, "A": 0.7 },
+  "images": [
+    {
+      "image_url": "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 7,
+      "round": 1,
+      "theme": "color",
+      "choice_type": "warm",
+      "p_delta": 0.20,
+      "a_delta": 0.15,
+      "alt": "warm-toned tangled wires close up",
+      "photographer_credit": "Unsplash photo-1513475382585-d06e58bcb0e0"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1533928298208-27ff66555d8d?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 7,
+      "round": 1,
+      "theme": "color",
+      "choice_type": "cold",
+      "p_delta": -0.20,
+      "a_delta": -0.15,
+      "alt": "cold shibuya crossing under grey sky",
+      "photographer_credit": "Unsplash photo-1533928298208-27ff66555d8d"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 7,
+      "round": 2,
+      "theme": "nature",
+      "choice_type": "sunny",
+      "p_delta": 0.25,
+      "a_delta": 0.10,
+      "alt": "harsh bright sunrise over mountains",
+      "photographer_credit": "Unsplash photo-1472214103451-9374bd1c798e"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 7,
+      "round": 2,
+      "theme": "nature",
+      "choice_type": "stormy",
+      "p_delta": -0.25,
+      "a_delta": 0.20,
+      "alt": "turbulent crashing ocean waves",
+      "photographer_credit": "Unsplash photo-1505142468610-359e7d316be0"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 7,
+      "round": 3,
+      "theme": "space",
+      "choice_type": "vast",
+      "p_delta": -0.10,
+      "a_delta": -0.20,
+      "alt": "dense overwhelming forest canopy from below",
+      "photographer_credit": "Unsplash photo-1500382017468-9049fed747ef"
+    },
+    {
+      "image_url": "https://images.unsplash.com/photo-1534430480872-3498386e7856?w=800&auto=format&fit=crop&q=80",
+      "bucket_id": 7,
+      "round": 3,
+      "theme": "space",
+      "choice_type": "close",
+      "p_delta": 0.15,
+      "a_delta": 0.10,
+      "alt": "packed subway car, close framing",
+      "photographer_credit": "Unsplash photo-1534430480872-3498386e7856"
+    }
+  ]
+}
