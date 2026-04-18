@@ -4,15 +4,15 @@
   "center": { "P": 0.7, "A": 0.7 },
   "images": [
     {
-      "image_url": "https://images.unsplash.com/photo-1482401869019-01ef0b79ad91?w=800&auto=format&fit=crop&q=80",
+      "image_url": "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&auto=format&fit=crop&q=80",
       "bucket_id": 1,
       "round": 1,
       "theme": "color",
       "choice_type": "warm",
       "p_delta": 0.20,
       "a_delta": 0.15,
-      "alt": "festival lights over crowd",
-      "photographer_credit": "Unsplash photo-1482401869019-01ef0b79ad91"
+      "alt": "concert crowd under warm stage lights, hands raised with phones",
+      "photographer_credit": "Unsplash photo-1501281668745-f7f57925c3b4"
     },
     {
       "image_url": "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&auto=format&fit=crop&q=80",
