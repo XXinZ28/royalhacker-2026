@@ -4,13 +4,35 @@
 
 An anonymous emotion-matching web app. A user answers 3 short questions, picks through 3 pairs of images, and is placed in a short real-time chat with another user feeling the same way right now.
 
+Repo: [github.com/XXinZ28/royalhacker-2026](https://github.com/XXinZ28/royalhacker-2026)
+
 ---
 
 ## 1. Project Overview
 
-Most apps ask you to label your feeling before they can help you. Resonance flips that: you answer three simple questions about how you're doing, pick instinctively between a few image pairs, and the app derives a **PAD vector** (Pleasure, Arousal, Dominance) from your answers. It then finds another user with a nearby vector and opens a one-off anonymous chat, seeded with an AI-generated opener calibrated to the shared emotional quadrant.
+Every communication app asks **who you are** before it can help you. Dating apps want photos. Social apps want friends. Therapy apps want history. None of them ask **how you feel right now** — but that's usually the reason you opened the app.
 
-No accounts, no social graph, no history. One moment, one stranger, the same weather inside.
+Resonance flips the primitive. You answer three simple questions about how you're doing, pick instinctively between a few image pairs, and the app derives a **PAD vector** (Pleasure, Arousal, Dominance) from your answers. It then finds another user with a nearby vector and opens a one-off anonymous chat, seeded with an opener calibrated to the shared emotional quadrant. Fifteen minutes later the conversation dissolves and the system generates a single shared postcard with one line from what was actually said.
+
+No accounts, no social graph, no profiles, no history. One moment, one stranger, the same weather inside.
+
+For the full design philosophy, see [`docs/concepts.md`](docs/concepts.md).
+
+## Documentation map
+
+If you're trying to understand the project in one pass, read in this order:
+
+| Doc | What it covers |
+|---|---|
+| This README | Project overview, feature list, modeling math, data layout |
+| [`docs/concepts.md`](docs/concepts.md) | The philosophy — the problem, the PAD model, Echo vs Healing, ephemerality, anonymity |
+| [`docs/architecture.md`](docs/architecture.md) | Three-layer system diagram, hot paths, what's deliberately missing |
+| [`docs/n8n-workflows.md`](docs/n8n-workflows.md) | Per-workflow logic — every node, every decision, every constraint |
+| [`docs/delta-rubric.md`](docs/delta-rubric.md) | The per-image `(p_delta, a_delta)` values and why |
+| [`docs/setup.md`](docs/setup.md) | End-to-end setup checklist from empty repo to live demo |
+| [`lovable-prompts/`](lovable-prompts/) | The seven prompts that built the frontend, in order |
+| [`n8n-workflows/README.md`](n8n-workflows/README.md) | Workflow import + activation steps |
+| [`n8n-workflows/DEPLOYED.json`](n8n-workflows/DEPLOYED.json) | Live webhook URLs and workflow IDs |
 
 ## 2. Key Features
 
@@ -231,6 +253,11 @@ Chat-Send writes to the sheet using the PascalCase keys (matching the original c
 
 ## 9.5. Changelog (v2 — April 2026)
 
+- **White-dwarf supernova ending transition** — new prompt `lovable-prompts/07-ending-transition.md`. When the chat ends, the conversation physically collapses into a point of light, detonates as a Type Ia flash, blooms into a nebula colored by the match's emotional quadrant, and the postcard rises from the remnant. Three seconds, screen center, no route flicker. Reduced-motion users get a 400ms crossfade fallback.
+- **Solo-demo puppet page** — new `demo/puppet.html`. Standalone HTML that impersonates a `demo_*` partner by calling chat-send/chat-poll webhooks directly. Lets you record demo videos with a real two-tab chat without needing a second device or person.
+- **(0,0) geocode bug fix** — Emotion-Intake's Compute Vector node now treats `(lat=0, lng=0)` as "geolocation failed" instead of writing the literal ocean coordinate to the sheet. Failed geolocations now route through the `gpt-5-mini` geocoder correctly, producing proper canonical names and coordinates.
+- **LangChain geocoder robustness** — Parse Geocode node now accepts string-number outputs (`"lat": "35.68"`) from the LLM, not just numeric ones. Fixes rare JSON parsing failures where gpt-5-mini quoted the coordinates.
+- **Three documentation deep-dives** — `docs/concepts.md` (the design philosophy), `docs/architecture.md` (three-layer system), `docs/n8n-workflows.md` (per-workflow logic). The README now links them as a reading-order map.
 - **Healing match mode** — new landing-page toggle, mutual opt-in, opposite-D eligibility. Plumbed through `Emotion-Intake`, `Emotion-Match`, and the opener bank. Lovable prompt: `lovable-prompts/02b-mode-toggle.md`.
 - **Per-round picks recorded in the sheet** — `user_vectors` expanded from 10 to 20 columns. Each of the three image picks now writes `roundN_choice`, `roundN_p_delta`, `roundN_a_delta`, so `final_P` / `final_A` are verifiable row-by-row.
 - **Mode-aware opener bank** — replaced the `gpt-5-mini` node (the n8n free AI credits proxy returns 404) with a deterministic JS code node that picks from 24 curated lines keyed by `match_mode × quadrant`. One-node swap when a real OpenAI key is wired in.
@@ -265,40 +292,59 @@ Chat-Send writes to the sheet using the PascalCase keys (matching the original c
 
 ```
 .
-├── .env.example               # public template
-├── .env                       # gitignored — real n8n token lives here
-├── README.md                  # this file
-├── user_vectors.csv           # header-only CSV template for the Sheets tab
-├── picture-dataset/
-│   ├── README.md              # dataset schema + delta rubric
-│   ├── bucket_1.json ... bucket_9.json
-├── n8n-workflows/
-│   ├── README.md              # import + activation steps
-│   ├── emotion-intake.json    # intake + per-round picks
-│   ├── emotion-match.json     # echo/healing eligibility + opener bank
-│   ├── chat-send.json
-│   ├── chat-poll.json
-│   ├── match-end.json
-│   ├── match-feed.json        # GET feed for the live globe (new)
-│   ├── demo-reset.json        # cron that clears demo_* match state (new)
-│   ├── chat-timeout.json      # cron that auto-ends idle matches (new)
-│   └── postcard-generate.json # POST /postcard — LLM highlight + bg image (new)
-├── lovable-prompts/
+├── README.md                        this file
+├── QUICKSTART.md                    minimum-steps path to a running demo
+├── .env.example                     public template
+├── .env                             gitignored — real n8n API token
+├── .env.lovable                     copy-paste env vars for Lovable project settings
+├── user_vectors.csv                 header-only CSV template for the Sheets tab
+├── fake1_users.csv                  demo seed users (12 demo_* partners)
+├── fake_chat_messages.csv           demo seed chat messages
+│
+├── picture-dataset/                 the 9 bucket JSONs with 6 pre-labeled images each
+│   ├── README.md                    dataset schema + delta rubric
+│   └── bucket_1.json ... bucket_9.json
+│
+├── n8n-workflows/                   the full backend, as visual workflows
+│   ├── README.md                    import + activation steps
+│   ├── DEPLOYED.json                live webhook URLs + workflow IDs
+│   ├── emotion-intake.json          intake + per-round picks + LLM geocoder
+│   ├── emotion-match.json           echo/healing eligibility + opener bank
+│   ├── chat-send.json               append message to chat_messages
+│   ├── chat-poll.json               fetch messages + pair_status signal
+│   ├── match-end.json               stamp match_ended_at on both rows
+│   ├── match-feed.json              GET feed for the live globe
+│   ├── demo-reset.json              cron that clears demo_* match state
+│   ├── chat-timeout.json            cron that auto-ends idle matches >15 min
+│   └── postcard-generate.json       POST /postcard — LLM highlight + bg image
+│
+├── lovable-prompts/                 build the frontend from these, in order
 │   ├── README.md
-│   ├── 01-scaffold.md
-│   ├── 02-questions.md
-│   ├── 02b-mode-toggle.md    # Echo/Healing toggle (new)
-│   ├── 03-image-rounds.md
-│   ├── 04-waiting-and-match.md
-│   ├── 05-chat.md
-│   └── 06-globe-display.md   # live-matches 3D globe for the demo screen (new)
+│   ├── 01-scaffold.md               project setup, routes, session UUID
+│   ├── 02-questions.md              the three PAD-initial questions
+│   ├── 02b-mode-toggle.md           Echo/Healing landing-page toggle
+│   ├── 03-image-rounds.md           three image-pair rounds
+│   ├── 04-waiting-and-match.md      match polling
+│   ├── 05-chat.md                   chat view (send + poll + end)
+│   ├── 06-globe-display.md          /globe route with simulator + live modes
+│   └── 07-ending-transition.md      white-dwarf supernova → postcard transition
+│
 ├── globe/
-│   └── live-matches.html      # standalone Globe.gl visualization (new)
+│   └── live-matches.html            standalone Globe.gl visualization for booth
+│
+├── demo/
+│   └── puppet.html                  solo-demo puppet page — impersonate a demo_* user
+│
 ├── docs/
-│   ├── delta-rubric.md        # scoring rationale
-│   └── setup.md               # end-to-end setup checklist
+│   ├── concepts.md                  the philosophy: PAD, Echo/Healing, ephemerality
+│   ├── architecture.md              three-layer system + hot paths
+│   ├── n8n-workflows.md             per-workflow logic deep dive
+│   ├── delta-rubric.md              per-image (p_delta, a_delta) rationale
+│   ├── setup.md                     end-to-end setup checklist
+│   └── screenshots/                 UI reference screenshots
+│
 └── archive/
-    └── cc-1st/                # archived v0 EchoWander 3D-globe concept
+    └── cc-1st/                      archived v0 EchoWander 3D-globe concept
 ```
 
 See [`docs/setup.md`](docs/setup.md) for the full setup checklist.
