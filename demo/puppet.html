@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Resonance · Demo Puppet</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root {
+    --bg: #0a0e27;
+    --panel: rgba(255,255,255,0.06);
+    --fg: #e7e9ff;
+    --dim: rgba(231,233,255,0.55);
+    --accent: #a78bfa;
+    --me: #7c3aed;
+    --them: #1f2937;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    min-height: 100vh;
+    background: radial-gradient(ellipse at top, #11163a 0%, #02020a 70%);
+    color: var(--fg);
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  }
+  .wrap {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 20px 18px 110px;
+  }
+  h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-weight: 400;
+    margin: 6px 0 2px;
+    font-size: 26px;
+  }
+  .sub {
+    color: var(--dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.26em;
+    margin-bottom: 16px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+  label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin: 8px 0 4px;
+  }
+  input, select, textarea {
+    width: 100%;
+    padding: 9px 11px;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(167,139,250,0.25);
+    color: var(--fg);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  button {
+    background: var(--accent);
+    color: #0a0e27;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row > input { flex: 1; }
+  .status {
+    font-size: 11px;
+    color: var(--dim);
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .status.ok { color: #4ade80; }
+  .status.err { color: #f87171; }
+  #feed {
+    min-height: 380px;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .msg {
+    max-width: 78%;
+    padding: 9px 13px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.45;
+    word-wrap: break-word;
+  }
+  .msg.me {
+    align-self: flex-end;
+    background: var(--me);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.them {
+    align-self: flex-start;
+    background: var(--them);
+    border-bottom-left-radius: 4px;
+  }
+  .msg.sys {
+    align-self: center;
+    font-size: 11px;
+    color: var(--dim);
+    font-style: italic;
+    background: transparent;
+  }
+  .meta {
+    font-size: 9px;
+    color: var(--dim);
+    margin-top: 2px;
+    letter-spacing: 0.1em;
+  }
+  .composer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(10,14,39,0.95);
+    backdrop-filter: blur(10px);
+    padding: 12px 18px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .composer .inner {
+    max-width: 520px;
+    margin: 0 auto;
+    display: flex;
+    gap: 8px;
+  }
+  .composer input { flex: 1; }
+  .hint {
+    font-size: 10px;
+    color: var(--dim);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+  .pill {
+    display: inline-block;
+    padding: 1px 7px;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 999px;
+    margin-left: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Resonance <span class="pill">puppet</span></h1>
+  <div class="sub">manual demo partner · two-tab mode</div>
+
+  <div class="panel">
+    <label>my session_id (the puppet / demo side)</label>
+    <select id="meSession">
+      <option value="demo_calm_1">demo_calm_1</option>
+      <option value="demo_calm_2">demo_calm_2</option>
+      <option value="demo_calm_3">demo_calm_3</option>
+      <option value="demo_joy_1">demo_joy_1</option>
+      <option value="demo_joy_2">demo_joy_2</option>
+      <option value="demo_joy_3">demo_joy_3</option>
+      <option value="demo_anxious_1">demo_anxious_1</option>
+      <option value="demo_anxious_2">demo_anxious_2</option>
+      <option value="demo_anxious_3">demo_anxious_3</option>
+      <option value="demo_melancholy_1">demo_melancholy_1</option>
+      <option value="demo_melancholy_2">demo_melancholy_2</option>
+      <option value="demo_melancholy_3">demo_melancholy_3</option>
+      <option value="__custom__">— custom —</option>
+    </select>
+    <input id="meSessionCustom" placeholder="paste custom session_id (if chosen above)" style="margin-top:6px; display:none" />
+
+    <label>partner session_id (the real user you just matched with)</label>
+    <input id="partnerSession" placeholder="e.g. 3f7e-...-8a21 (copy from real tab's localStorage)" />
+
+    <div class="row" style="margin-top: 12px;">
+      <button id="connectBtn">connect</button>
+      <button id="disconnectBtn" disabled style="background:#4b5563;color:white">disconnect</button>
+    </div>
+    <div id="status" class="status">idle</div>
+  </div>
+
+  <div id="feed" class="panel"></div>
+</div>
+
+<div class="composer">
+  <div class="inner">
+    <input id="textInput" placeholder="type a reply…" disabled autocomplete="off" />
+    <button id="sendBtn" disabled>send</button>
+  </div>
+  <div class="hint">
+    1. Let the real user finish the questionnaire on their phone/tab.<br />
+    2. On that tab, open DevTools → Application → Local Storage → copy <code>resonance_session_id</code>.<br />
+    3. Paste it into <b>partner session_id</b> above. Pick a <b>demo_*</b> that matches their quadrant &amp; mode. Click connect.
+  </div>
+</div>
+
+<script>
+const CHAT_SEND_URL = 'https://xinxintzzz.app.n8n.cloud/webhook/chat-send';
+const CHAT_POLL_URL = 'https://xinxintzzz.app.n8n.cloud/webhook/chat-poll';
+const POLL_MS = 2000;
+
+const state = {
+  me: '',
+  partner: '',
+  matchPairId: '',
+  lastSince: '',
+  seen: new Set(),
+  poller: null
+};
+
+const $ = id => document.getElementById(id);
+const meSel = $('meSession');
+const meCustom = $('meSessionCustom');
+const partnerIn = $('partnerSession');
+const connectBtn = $('connectBtn');
+const disconnectBtn = $('disconnectBtn');
+const statusEl = $('status');
+const feed = $('feed');
+const textInput = $('textInput');
+const sendBtn = $('sendBtn');
+
+meSel.onchange = () => {
+  meCustom.style.display = meSel.value === '__custom__' ? 'block' : 'none';
+};
+
+function setStatus(msg, cls) {
+  statusEl.className = 'status ' + (cls || '');
+  statusEl.textContent = msg;
+}
+
+function buildPairId(a, b) {
+  return [a, b].sort().join('__');
+}
+
+function addMsg(m) {
+  if (state.seen.has(m.message_id)) return;
+  state.seen.add(m.message_id);
+
+  const div = document.createElement('div');
+  if (m.from_session_id === 'system' || (m.text || '').startsWith('__')) {
+    div.className = 'msg sys';
+    div.textContent = '— ' + (m.text || '').replace(/__/g,'').replace(/_/g,' ') + ' —';
+  } else if (m.from_session_id === state.me) {
+    div.className = 'msg me';
+    div.textContent = m.text;
+  } else {
+    div.className = 'msg them';
+    div.textContent = m.text;
+  }
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+async function poll() {
+  if (!state.matchPairId) return;
+  try {
+    const url = new URL(CHAT_POLL_URL);
+    url.searchParams.set('match_pair_id', state.matchPairId);
+    if (state.lastSince) url.searchParams.set('since', state.lastSince);
+    const r = await fetch(url);
+    const data = await r.json();
+    const msgs = data.messages || data || [];
+    for (const m of msgs) {
+      addMsg(m);
+      if (m.timestamp && (!state.lastSince || m.timestamp > state.lastSince)) {
+        state.lastSince = m.timestamp;
+      }
+    }
+    if (data.pair_status === 'ended') {
+      setStatus('partner ended the chat', 'err');
+      disconnect();
+    } else {
+      setStatus('connected · pair ' + state.matchPairId.slice(0, 20) + '…', 'ok');
+    }
+  } catch (e) {
+    setStatus('poll error: ' + e.message, 'err');
+  }
+}
+
+async function send() {
+  const text = textInput.value.trim();
+  if (!text) return;
+  textInput.value = '';
+  try {
+    const r = await fetch(CHAT_SEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        match_pair_id: state.matchPairId,
+        from_session_id: state.me,
+        text,
+        timestamp: new Date().toISOString()
+      })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    // poll right away so the new message shows up fast
+    poll();
+  } catch (e) {
+    setStatus('send error: ' + e.message, 'err');
+  }
+}
+
+function connect() {
+  const me = meSel.value === '__custom__' ? meCustom.value.trim() : meSel.value;
+  const partner = partnerIn.value.trim();
+  if (!me || !partner) {
+    setStatus('need both session_ids', 'err');
+    return;
+  }
+  state.me = me;
+  state.partner = partner;
+  state.matchPairId = buildPairId(me, partner);
+  state.lastSince = '';
+  state.seen.clear();
+  feed.innerHTML = '';
+
+  textInput.disabled = false;
+  sendBtn.disabled = false;
+  connectBtn.disabled = true;
+  disconnectBtn.disabled = false;
+  meSel.disabled = true;
+  meCustom.disabled = true;
+  partnerIn.disabled = true;
+
+  setStatus('connecting…');
+  poll();
+  state.poller = setInterval(poll, POLL_MS);
+  textInput.focus();
+}
+
+function disconnect() {
+  clearInterval(state.poller);
+  state.poller = null;
+  textInput.disabled = true;
+  sendBtn.disabled = true;
+  connectBtn.disabled = false;
+  disconnectBtn.disabled = true;
+  meSel.disabled = false;
+  meCustom.disabled = false;
+  partnerIn.disabled = false;
+}
+
+connectBtn.onclick = connect;
+disconnectBtn.onclick = disconnect;
+sendBtn.onclick = send;
+textInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); send(); }
+});
+</script>
+</body>
+</html>
