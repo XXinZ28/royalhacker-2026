@@ -1,0 +1,194 @@
+{
+  "name": "Chat-Timeout",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "name": "Every 1 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ],
+      "id": "cron"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "user_vectors",
+          "mode": "name",
+          "cachedResultName": "user_vectors"
+        },
+        "options": {}
+      },
+      "name": "Read Users",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        400,
+        300
+      ],
+      "id": "ru",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "chat_messages",
+          "mode": "name",
+          "cachedResultName": "chat_messages"
+        },
+        "options": {}
+      },
+      "name": "Read Messages",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        600,
+        300
+      ],
+      "id": "rm",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const IDLE_MS = 15 * 60 * 1000;\nconst now = Date.now();\nconst users = $('Read Users').all().map(i => i.json);\nconst msgs  = $('Read Messages').all().map(i => i.json);\n\nconst lastMsgForPair = new Map();\nfor (const m of msgs) {\n  const pair = String(m['Match Pair Id'] || '').trim();\n  if (!pair) continue;\n  const ts = m['Timestamp'] ? Date.parse(m['Timestamp']) : 0;\n  if (!ts) continue;\n  const cur = lastMsgForPair.get(pair) || 0;\n  if (ts > cur) lastMsgForPair.set(pair, ts);\n}\n\nconst bySid = new Map();\nfor (const u of users) {\n  const sid = String(u.session_id || '').trim();\n  if (sid) bySid.set(sid, u);\n}\n\nconst seenPair = new Set();\nconst out = [];\nfor (const u of users) {\n  const sid = String(u.session_id || '').trim();\n  const pSid = String(u.matched_user_id || '').trim();\n  if (!sid || !pSid) continue;\n  if (String(u.match_ended_at || '').trim()) continue;\n  const partner = bySid.get(pSid);\n  if (partner && String(partner.match_ended_at || '').trim()) continue;\n  const pair = [sid, pSid].sort().join('__');\n  if (seenPair.has(pair)) continue;\n  seenPair.add(pair);\n  const matchedAt = u.match_timestamp ? Date.parse(u.match_timestamp) : 0;\n  if (!matchedAt) continue;\n  const lastMsg = lastMsgForPair.get(pair) || 0;\n  const lastActivity = Math.max(matchedAt, lastMsg);\n  if ((now - lastActivity) < IDLE_MS) continue;\n  const endedAt = new Date(now).toISOString();\n  out.push({ json: { session_id: sid,  match_ended_at: endedAt, reason: 'timeout' } });\n  out.push({ json: { session_id: pSid, match_ended_at: endedAt, reason: 'timeout' } });\n}\nreturn out;\n"
+      },
+      "name": "Find Stale Pairs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ],
+      "id": "fs",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "user_vectors",
+          "mode": "name",
+          "cachedResultName": "user_vectors"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "session_id"
+          ],
+          "value": {
+            "session_id": "={{ $json.session_id }}",
+            "match_ended_at": "={{ $json.match_ended_at }}"
+          }
+        },
+        "options": {}
+      },
+      "name": "Stamp Ended At",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1200,
+        200
+      ],
+      "id": "upd",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
+        }
+      },
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "Every 1 min": {
+      "main": [
+        [
+          {
+            "node": "Read Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Users": {
+      "main": [
+        [
+          {
+            "node": "Read Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Messages": {
+      "main": [
+        [
+          {
+            "node": "Find Stale Pairs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Stale Pairs": {
+      "main": [
+        [
+          {
+            "node": "Stamp Ended At",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

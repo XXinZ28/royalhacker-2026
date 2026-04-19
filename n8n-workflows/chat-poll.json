@@ -1,9 +1,8 @@
 {
-  "name": "Chat-Poll",
+  "name": "4-Chat-Poll",
   "nodes": [
     {
       "parameters": {
-        "httpMethod": "GET",
         "path": "chat-poll",
         "responseMode": "lastNode",
         "options": {
@@ -13,53 +12,159 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [200, 300],
-      "id": "chat-poll-webhook"
+      "position": [
+        208,
+        304
+      ],
+      "id": "chat-poll-webhook",
+      "webhookId": "b2d95b29-c67e-46e0-9bf4-af5a8eaab2a9"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw/edit",
+          "cachedResultName": "chat_messages"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "chat_messages",
+          "mode": "name",
+          "cachedResultName": "chat_messages"
+        },
+        "options": {}
+      },
+      "name": "Read Messages",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        304
+      ],
+      "id": "read-msgs",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const q = $('Webhook').first().json.query || {};\nconst match_pair_id = String(q.match_pair_id || '').trim();\nconst since = q.since ? Date.parse(q.since) : 0;\nif (!match_pair_id) throw new Error('match_pair_id required');\n\nconst allRows = $input.all().map(i => i.json);\n\n// Determine which upstream read this item came from by shape:\n// chat_messages rows have 'Match Pair Id'; user_vectors rows have 'session_id'.\nconst msgRows   = allRows.filter(r => 'Match Pair Id' in r);\nconst userRows  = allRows.filter(r => 'session_id' in r && !('Match Pair Id' in r));\n\nconst mapped = msgRows\n  .filter(r => String(r['Match Pair Id']) === match_pair_id)\n  .map(r => ({\n    message_id: r['Message Id'],\n    match_pair_id: r['Match Pair Id'],\n    from_session_id: r['From Session Id'],\n    text: r['Text'],\n    timestamp: r['Timestamp']\n  }))\n  .filter(m => {\n    // drop legacy system leak rows that may still sit in chat_messages\n    if (m.from_session_id === 'system') return false;\n    if (m.text === '__partner_left__' || m.text === '__chat_timeout__') return false;\n    const ts = m.timestamp ? Date.parse(m.timestamp) : 0;\n    return ts > since;\n  });\nmapped.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));\n\n// Pair status derived from user_vectors match_ended_at on either side.\nconst pairSids = match_pair_id.split('__');\nlet pair_status = 'active';\nlet ended_at = '';\nfor (const u of userRows) {\n  if (!pairSids.includes(String(u.session_id))) continue;\n  const ea = String(u.match_ended_at || '').trim();\n  if (ea) { pair_status = 'ended'; ended_at = ea; break; }\n}\n\nreturn [{ json: { messages: mapped, pair_status, ended_at } }];\n"
+      },
+      "name": "Filter & Sort",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        304
+      ],
+      "id": "filter-sort"
     },
     {
       "parameters": {
         "operation": "read",
         "documentId": {
           "__rl": true,
-          "value": "={{ $env.GOOGLE_SHEET_ID }}",
-          "mode": "id"
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw/edit",
+          "cachedResultName": "user_vectors"
         },
-        "sheetName": "chat_messages",
+        "sheetName": {
+          "__rl": true,
+          "value": "user_vectors",
+          "mode": "name",
+          "cachedResultName": "user_vectors"
+        },
         "options": {}
       },
-      "name": "Read Messages",
+      "name": "Read Users",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [450, 300],
-      "id": "read-msgs",
+      "position": [
+        450,
+        500
+      ],
+      "id": "rupoll",
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "REPLACE_WITH_SHEETS_CRED_ID",
-          "name": "Google Sheets OAuth2"
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const q = $('Webhook').first().json.query || {};\nconst match_pair_id = String(q.match_pair_id || '').trim();\nconst since = q.since ? Date.parse(q.since) : 0;\n\nif (!match_pair_id) throw new Error('match_pair_id required');\n\nconst rows = $input.all().map(i => i.json);\nconst filtered = rows.filter(r => {\n  if (String(r.match_pair_id) !== match_pair_id) return false;\n  const ts = r.timestamp ? Date.parse(r.timestamp) : 0;\n  return ts > since;\n});\nfiltered.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));\n\nreturn [{ json: { messages: filtered } }];"
+        "mode": "append",
+        "options": {}
       },
-      "name": "Filter & Sort",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [700, 300],
-      "id": "filter-sort"
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        700,
+        400
+      ],
+      "id": "mrg"
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "Read Messages", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Read Messages",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Messages": {
-      "main": [[{ "node": "Filter & Sort", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Users": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Filter & Sort",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
   "settings": {
     "executionOrder": "v1"
-  }
+  },
+  "active": false
 }

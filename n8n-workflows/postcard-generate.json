@@ -1,0 +1,317 @@
+{
+  "name": "Postcard-Generate",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "postcard",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ],
+      "id": "wh",
+      "webhookId": "cd4209b8-14f8-42cd-966a-9524a05afe61"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "user_vectors",
+          "mode": "name",
+          "cachedResultName": "user_vectors"
+        },
+        "options": {}
+      },
+      "name": "Read Users",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        450,
+        200
+      ],
+      "id": "ru",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "chat_messages",
+          "mode": "name",
+          "cachedResultName": "chat_messages"
+        },
+        "options": {}
+      },
+      "name": "Read Messages",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        450,
+        400
+      ],
+      "id": "rm",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        700,
+        300
+      ],
+      "id": "mg"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body || {};\nconst match_pair_id = String(body.match_pair_id || '').trim();\nconst session_id = String(body.session_id || '').trim();\nconst image_urls = Array.isArray(body.image_urls) ? body.image_urls.filter(u => typeof u === 'string' && u.startsWith('http')) : [];\nif (!match_pair_id || !session_id) throw new Error('match_pair_id and session_id required');\n\nconst all = $input.all().map(i => i.json);\nconst userRows = all.filter(r => 'session_id' in r && !('Match Pair Id' in r));\nconst msgRows  = all.filter(r => 'Match Pair Id' in r);\n\nconst pairSids = match_pair_id.split('__');\nconst bySid = new Map();\nfor (const u of userRows) {\n  const sid = String(u.session_id || '').trim();\n  if (sid) bySid.set(sid, u);\n}\nconst meRow = bySid.get(session_id);\nconst youSid = pairSids.find(s => s !== session_id);\nconst youRow = bySid.get(youSid);\nif (!meRow || !youRow) throw new Error('match pair not found in user_vectors');\n\nconst pairMsgs = msgRows\n  .filter(r => String(r['Match Pair Id']) === match_pair_id && String(r['From Session Id']) !== 'system' && !String(r['Text'] || '').startsWith('__'))\n  .map(r => ({\n    from: (String(r['From Session Id']) === session_id) ? 'me' : 'them',\n    text: String(r['Text'] || '').trim(),\n    ts: r['Timestamp'] ? Date.parse(r['Timestamp']) : 0\n  }))\n  .filter(m => m.text.length > 0)\n  .sort((a,b) => a.ts - b.ts);\n\n// Conversation transcript for the LLM. Cap to keep prompt small.\nconst transcript = pairMsgs.slice(-30).map(m => `${m.from}: ${m.text}`).join('\\n');\nconst message_count = pairMsgs.length;\nconst duration_minutes = (pairMsgs.length >= 2) ? Math.round((pairMsgs[pairMsgs.length-1].ts - pairMsgs[0].ts) / 60000) : 0;\n\n// Quadrant label from me final_P/A\nconst P = Number(meRow.final_P), A = Number(meRow.final_A);\nconst quadrant = (P>=0 && A>=0) ? 'joy' : (P>=0 && A<0) ? 'calm' : (P<0 && A>=0) ? 'anxious' : 'melancholy';\n\n// Background image: random from the 3 user-provided images. Fallback to a bucket image derived from initial_P/A.\nfunction bucketId(iP, iA) {\n  const p = Number(iP), a = Number(iA);\n  const col = a >= 0.35 ? 0 : a >= -0.35 ? 1 : 2;\n  const row = p >= 0.35 ? 0 : p >= -0.35 ? 1 : 2;\n  return row*3 + col + 1;\n}\nconst buck = bucketId(meRow.initial_P, meRow.initial_A);\nlet background_image_url;\nif (image_urls.length > 0) {\n  // pick a stable one per pair\n  let hash = 5381;\n  for (let i=0;i<match_pair_id.length;i++) hash=((hash<<5)+hash)+match_pair_id.charCodeAt(i);\n  background_image_url = image_urls[(hash >>> 0) % image_urls.length];\n} else {\n  background_image_url = '';\n}\n\nreturn [{ json: {\n  match_pair_id,\n  session_id,\n  me_city: String(meRow.city || ''),\n  me_lat: Number(meRow.lat) || null,\n  me_lng: Number(meRow.lng) || null,\n  partner_city: String(youRow.city || ''),\n  partner_lat: Number(youRow.lat) || null,\n  partner_lng: Number(youRow.lng) || null,\n  mode: String(meRow.match_mode || 'echo'),\n  quadrant,\n  bucket: buck,\n  message_count,\n  duration_minutes,\n  transcript,\n  background_image_url,\n  _no_chat: transcript.length === 0\n} }];"
+      },
+      "name": "Prepare Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        950,
+        300
+      ],
+      "id": "prep",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json._no_chat }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Has Chat?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1150,
+        300
+      ],
+      "id": "ifchat"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Two strangers just ended an anonymous ~15-minute chat on an emotion-matching app called Resonance.\nMode: {{ $json.mode }}  (echo = they shared the same emotional weather; healing = complementary, one talked and one listened)\nShared emotional quadrant: {{ $json.quadrant }}\nCities: {{ $json.me_city }}  \u2194  {{ $json.partner_city }}\nMessages exchanged: {{ $json.message_count }}\nDuration: {{ $json.duration_minutes }} minutes\n\nTranscript (me = the requester, them = the stranger):\n{{ $json.transcript }}\n\nTask: write ONE warm, specific, non-generic sentence (under 18 words) that captures the feeling of this exchange. It will be printed on a postcard they can keep. No emojis. No quotes. Lowercase. Don't name emotions directly. Don't mention the app. Don't use the word \"journey\" or \"beautiful\". Respond with only the sentence.",
+        "options": {}
+      },
+      "name": "Highlight Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1400,
+        200
+      ],
+      "id": "agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "name": "LM gpt-5-mini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1400,
+        400
+      ],
+      "id": "lm",
+      "credentials": {
+        "openAiApi": {
+          "id": "TCLXIBfS0vNSGyPJ",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Prepare Context').first().json;\nconst raw = $input.first().json;\nlet highlight = String(raw.output || raw.text || '').trim();\nhighlight = highlight.replace(/^[\"'\u201c\u201d]|[\"'\u201c\u201d]$/g,'').trim();\nif (!highlight) highlight = 'a small window opened for a little while, and then closed.';\n\n// Subtitle: city-to-city + duration\nconst cityLine = (ctx.me_city && ctx.partner_city) ? `${ctx.me_city} \u2194 ${ctx.partner_city}` : '';\nconst durLine = ctx.duration_minutes > 0 ? `${ctx.duration_minutes} min, ${ctx.message_count} messages` : `${ctx.message_count} messages`;\n\nreturn [{ json: {\n  ok: true,\n  match_pair_id: ctx.match_pair_id,\n  highlight,\n  subtitle: [cityLine, durLine].filter(Boolean).join(' \u00b7 '),\n  me_city: ctx.me_city,\n  me_lat: ctx.me_lat,\n  me_lng: ctx.me_lng,\n  partner_city: ctx.partner_city,\n  partner_lat: ctx.partner_lat,\n  partner_lng: ctx.partner_lng,\n  mode: ctx.mode,\n  quadrant: ctx.quadrant,\n  bucket: ctx.bucket,\n  message_count: ctx.message_count,\n  duration_minutes: ctx.duration_minutes,\n  background_image_url: ctx.background_image_url\n} }];"
+      },
+      "name": "Build Postcard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1650,
+        200
+      ],
+      "id": "bp"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fallback when no chat messages exist.\nconst ctx = $('Prepare Context').first().json;\nconst highlight = ctx.mode === 'healing' ? 'you showed up for each other, even without words.' : 'the same quiet moment, shared across the distance.';\nconst cityLine = (ctx.me_city && ctx.partner_city) ? `${ctx.me_city} \u2194 ${ctx.partner_city}` : '';\nreturn [{ json: {\n  ok: true,\n  match_pair_id: ctx.match_pair_id,\n  highlight,\n  subtitle: cityLine,\n  me_city: ctx.me_city,\n  me_lat: ctx.me_lat,\n  me_lng: ctx.me_lng,\n  partner_city: ctx.partner_city,\n  partner_lat: ctx.partner_lat,\n  partner_lng: ctx.partner_lng,\n  mode: ctx.mode,\n  quadrant: ctx.quadrant,\n  bucket: ctx.bucket,\n  message_count: 0,\n  duration_minutes: 0,\n  background_image_url: ctx.background_image_url\n} }];"
+      },
+      "name": "No-Chat Fallback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        550
+      ],
+      "id": "nochat"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Users",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Users": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Messages": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Prepare Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Context": {
+      "main": [
+        [
+          {
+            "node": "Has Chat?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Chat?": {
+      "main": [
+        [
+          {
+            "node": "Highlight Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No-Chat Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Highlight Agent": {
+      "main": [
+        [
+          {
+            "node": "Build Postcard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LM gpt-5-mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Highlight Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

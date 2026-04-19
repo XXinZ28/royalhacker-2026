@@ -1,0 +1,395 @@
+<\!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Resonance · Live Matches</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg-0: #02020a;
+    --bg-1: #0a0e27;
+    --fg: #e7e9ff;
+    --dim: rgba(231, 233, 255, 0.55);
+    --accent: #a78bfa;
+    --accent-warm: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 100vw; height: 100vh; overflow: hidden;
+    background: radial-gradient(ellipse at center, #05061a 0%, #000000 75%);
+    color: var(--fg);
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    letter-spacing: 0.02em;
+  }
+  #globeArea { position: absolute; inset: 0; }
+  .chrome {
+    position: absolute; z-index: 3;
+    pointer-events: none;
+    font-feature-settings: 'tnum';
+  }
+  .top-left {
+    top: 24px; left: 32px;
+  }
+  .top-left .title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 28px; letter-spacing: 0.02em;
+  }
+  .top-left .sub {
+    margin-top: 4px;
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.28em;
+    color: var(--dim);
+  }
+  .top-right {
+    top: 24px; right: 32px; text-align: right;
+  }
+  .top-right .count {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 36px;
+    color: var(--accent);
+    text-shadow: 0 0 12px rgba(167, 139, 250, 0.55);
+  }
+  .top-right .label {
+    font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.3em;
+    color: var(--dim);
+  }
+  .bottom-left {
+    bottom: 24px; left: 32px;
+    max-width: 360px;
+    font-size: 11px;
+    color: var(--dim);
+    line-height: 1.6;
+  }
+  .legend { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin-top: 10px; }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    align-self: center;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .bottom-right {
+    bottom: 24px; right: 32px;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    text-align: right;
+    line-height: 1.6;
+  }
+  .bottom-right .last {
+    color: var(--fg);
+  }
+  /* scanline overlay for extra synth-feel */
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.012) 0px,
+        rgba(255,255,255,0.012) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    mix-blend-mode: screen;
+    z-index: 10;
+  }
+  .mode-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-left: 6px;
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/globe.gl@2.33.4/dist/globe.gl.min.js"></script>
+</head>
+<body>
+<div id="globeArea"></div>
+
+<div class="chrome top-left">
+  <div class="title">Resonance</div>
+  <div class="sub">live matches · global feed</div>
+</div>
+
+<div class="chrome top-right">
+  <div class="count" id="matchCount">0</div>
+  <div class="label">resonances in the last 2 minutes</div>
+</div>
+
+<div class="chrome bottom-left">
+  an anonymous chat begins every time two emotional vectors find each other.
+  each arc is one moment two strangers agreed to share the same inner weather.
+  <div class="legend">
+    <span class="dot" style="color:#fbbf24"></span><span>joy · high pleasure, high arousal</span>
+    <span class="dot" style="color:#a78bfa"></span><span>calm · high pleasure, low arousal</span>
+    <span class="dot" style="color:#22d3ee"></span><span>anxious · low pleasure, high arousal</span>
+    <span class="dot" style="color:#60a5fa"></span><span>melancholy · low pleasure, low arousal</span>
+    <span class="dot" style="color:#f472b6"></span><span>healing · complementary match</span>
+  </div>
+</div>
+
+<div class="chrome bottom-right" id="feed">
+  <div>live-feed</div>
+  <div class="last" id="feedLast">waiting for the first resonance…</div>
+</div>
+
+<script>
+/* =========================================================================
+ * Resonance — live-matches globe
+ * Standalone demo. No build step. No backend required.
+ * Plug in a real data source by calling `pushMatch(match)` instead of the
+ * simulator. See `SIMULATOR` block at the bottom.
+ * ========================================================================= */
+
+// ---- Emotion palette ----------------------------------------------------
+// PAD quadrant -> color. D (dominance) is reflected in stroke intensity.
+// 'healing' mode overrides with pink to signal complementarity.
+const EMOTION_COLORS = {
+  joy:        '#fbbf24', // +P +A
+  calm:       '#a78bfa', // +P -A
+  anxious:    '#22d3ee', // -P +A
+  melancholy: '#60a5fa', // -P -A
+  healing:    '#f472b6'  // complementary match — pink
+};
+
+function quadrant(p, a) {
+  if (p >= 0 &&  a >= 0) return 'joy';
+  if (p >= 0 &&  a <  0) return 'calm';
+  if (p <  0 &&  a >= 0) return 'anxious';
+  return 'melancholy';
+}
+
+// ---- City "nodes" -------------------------------------------------------
+// We bias random locations to these hubs so the demo reads like real usage.
+const CITIES = [
+  { name: 'Copenhagen', lat: 55.6761, lng:  12.5683 },
+  { name: 'London',     lat: 51.5072, lng:  -0.1276 },
+  { name: 'Paris',      lat: 48.8566, lng:   2.3522 },
+  { name: 'Berlin',     lat: 52.5200, lng:  13.4050 },
+  { name: 'New York',   lat: 40.7128, lng: -74.0060 },
+  { name: 'São Paulo',  lat: -23.5505, lng: -46.6333 },
+  { name: 'Lagos',      lat:  6.5244, lng:   3.3792 },
+  { name: 'Nairobi',    lat: -1.2921, lng:  36.8219 },
+  { name: 'Istanbul',   lat: 41.0082, lng:  28.9784 },
+  { name: 'Mumbai',     lat: 19.0760, lng:  72.8777 },
+  { name: 'Shanghai',   lat: 31.2304, lng: 121.4737 },
+  { name: 'Tokyo',      lat: 35.6762, lng: 139.6503 },
+  { name: 'Seoul',      lat: 37.5665, lng: 126.9780 },
+  { name: 'Singapore',  lat:  1.3521, lng: 103.8198 },
+  { name: 'Sydney',     lat: -33.8688, lng: 151.2093 },
+  { name: 'Auckland',   lat: -36.8485, lng: 174.7633 },
+  { name: 'Mexico City',lat: 19.4326, lng: -99.1332 },
+  { name: 'Los Angeles',lat: 34.0522, lng:-118.2437 },
+  { name: 'Cape Town',  lat: -33.9249, lng: 18.4241 },
+  { name: 'Reykjavik',  lat: 64.1466, lng: -21.9426 }
+];
+
+function jitter(deg, amt) { return deg + (Math.random() - 0.5) * amt; }
+
+function nearCity() {
+  const c = CITIES[Math.floor(Math.random() * CITIES.length)];
+  return { lat: jitter(c.lat, 4), lng: jitter(c.lng, 4), city: c.name };
+}
+
+// ---- Globe init ---------------------------------------------------------
+const world = Globe()(document.getElementById('globeArea'))
+  .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
+  .bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png')
+  .backgroundColor('rgba(0,0,0,0)')
+  .showAtmosphere(true)
+  .atmosphereColor('#7c3aed')
+  .atmosphereAltitude(0.18);
+
+// Start view
+world.pointOfView({ lat: 30, lng: 10, altitude: 2.4 }, 0);
+
+// Auto-rotate
+const controls = world.controls();
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.35;
+controls.enableDamping = true;
+
+// Arcs
+world
+  .arcsData([])
+  .arcStartLat(d => d.from.lat)
+  .arcStartLng(d => d.from.lng)
+  .arcEndLat(d => d.to.lat)
+  .arcEndLng(d => d.to.lng)
+  .arcColor(d => {
+    // Gradient both ends use the same color so the arc reads as one emotion.
+    const rgba1 = hexToRgba(d.color, 0.95);
+    const rgba2 = hexToRgba(d.color, 0.25);
+    return [rgba1, rgba2];
+  })
+  .arcStroke(d => 0.45 + 0.6 * (d.intensity || 0.6))
+  .arcDashLength(0.4)
+  .arcDashGap(2)
+  .arcDashInitialGap(() => Math.random())
+  .arcDashAnimateTime(2200)
+  .arcAltitudeAutoScale(0.55);
+
+// Points (endpoints of active matches)
+world
+  .pointsData([])
+  .pointLat('lat')
+  .pointLng('lng')
+  .pointColor('color')
+  .pointAltitude(0.005)
+  .pointRadius(0.35)
+  .pointsMerge(false);
+
+// Rings (ripples at the endpoints — the "aha" of a new match)
+world
+  .ringsData([])
+  .ringLat('lat')
+  .ringLng('lng')
+  .ringColor(d => (t => hexToRgba(d.color, 1 - t)))
+  .ringMaxRadius(4)
+  .ringPropagationSpeed(2.4)
+  .ringRepeatPeriod(900);
+
+// Static hub labels — faint
+world
+  .labelsData(CITIES)
+  .labelLat('lat')
+  .labelLng('lng')
+  .labelText('name')
+  .labelSize(0.55)
+  .labelColor(() => 'rgba(231, 233, 255, 0.28)')
+  .labelResolution(2)
+  .labelAltitude(0.01);
+
+// ---- State --------------------------------------------------------------
+const arcs = [];     // active arcs (TTL-bound)
+const points = [];   // active endpoints (TTL-bound)
+const rings = [];    // ripples currently animating
+const recent = [];   // for the rolling match-count widget (last 2 min)
+const ARC_TTL_MS = 6500;
+const POINT_TTL_MS = 12000;
+const RING_TTL_MS = 3500;
+
+function prune() {
+  const now = Date.now();
+  for (let i = arcs.length - 1; i >= 0; i--) if (now - arcs[i].t0 > ARC_TTL_MS) arcs.splice(i, 1);
+  for (let i = points.length - 1; i >= 0; i--) if (now - points[i].t0 > POINT_TTL_MS) points.splice(i, 1);
+  for (let i = rings.length - 1; i >= 0; i--) if (now - rings[i].t0 > RING_TTL_MS) rings.splice(i, 1);
+  for (let i = recent.length - 1; i >= 0; i--) if (now - recent[i] > 120000) recent.splice(i, 1);
+}
+
+function render() {
+  world.arcsData(arcs.slice());
+  world.pointsData(points.slice());
+  world.ringsData(rings.slice());
+  document.getElementById('matchCount').textContent = String(recent.length).padStart(2, '0');
+}
+
+// ---- Public API ---------------------------------------------------------
+// match = { from:{lat,lng}, to:{lat,lng}, mode:'echo'|'healing',
+//           final_P, final_A, intensity (0..1) }
+function pushMatch(m) {
+  const now = Date.now();
+  const emo = m.mode === 'healing' ? 'healing' : quadrant(m.final_P, m.final_A);
+  const color = EMOTION_COLORS[emo];
+
+  const arc = {
+    from: m.from,
+    to: m.to,
+    color,
+    intensity: m.intensity ?? 0.7,
+    mode: m.mode || 'echo',
+    emotion: emo,
+    t0: now
+  };
+  arcs.push(arc);
+
+  const p1 = { lat: m.from.lat, lng: m.from.lng, color, t0: now };
+  const p2 = { lat: m.to.lat,   lng: m.to.lng,   color, t0: now };
+  points.push(p1, p2);
+
+  rings.push({ lat: m.from.lat, lng: m.from.lng, color, t0: now });
+  rings.push({ lat: m.to.lat,   lng: m.to.lng,   color, t0: now });
+
+  recent.push(now);
+  updateFeedLine(m, emo);
+  render();
+}
+
+function updateFeedLine(m, emo) {
+  const el = document.getElementById('feedLast');
+  const modeLbl = m.mode === 'healing'
+    ? '<span class="mode-pill" style="color:#f472b6">healing</span>'
+    : '<span class="mode-pill" style="color:#a78bfa">echo</span>';
+  const pair = (m.from.city || '??') + '  ⟷  ' + (m.to.city || '??');
+  el.innerHTML = pair + modeLbl;
+}
+
+// ---- Helpers ------------------------------------------------------------
+function hexToRgba(hex, a) {
+  const h = hex.replace('#','');
+  const bigint = parseInt(h.length === 3 ? h.split('').map(c=>c+c).join('') : h, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
+// Expose for real-data plug-in
+window.Resonance = { pushMatch };
+
+// ---- SIMULATOR ----------------------------------------------------------
+// Replace with a websocket / poll against your n8n feed in production.
+// Each tick: generate one random match. Occasionally a 'healing' one.
+function generateMatch() {
+  const from = nearCity();
+  const to   = nearCity();
+  // ensure two different hubs
+  if (from.city === to.city) return generateMatch();
+
+  // PAD sample — cluster around quadrants so colors distribute nicely
+  const quad = Math.floor(Math.random() * 4);
+  const pSign = (quad === 0 || quad === 1) ? 1 : -1;
+  const aSign = (quad === 0 || quad === 2) ? 1 : -1;
+  const final_P = pSign * (0.3 + Math.random() * 0.5);
+  const final_A = aSign * (0.3 + Math.random() * 0.5);
+
+  const mode = Math.random() < 0.18 ? 'healing' : 'echo';
+  const intensity = 0.4 + Math.random() * 0.6;
+
+  return { from, to, mode, final_P, final_A, intensity };
+}
+
+let tickMs = 1800;
+function simulatorTick() {
+  pushMatch(generateMatch());
+  // Occasional burst — feels more alive
+  if (Math.random() < 0.20) {
+    setTimeout(() => pushMatch(generateMatch()), 350);
+  }
+  tickMs = 900 + Math.random() * 2500;
+  setTimeout(simulatorTick, tickMs);
+}
+
+// Prime with a few so the globe isn't empty on open
+for (let i = 0; i < 4; i++) pushMatch(generateMatch());
+
+// Start stream after a beat
+setTimeout(simulatorTick, 1200);
+
+// Prune loop — keeps arc/point/ring lists bounded
+setInterval(() => { prune(); render(); }, 600);
+
+// Resize
+window.addEventListener('resize', () => {
+  world.width(window.innerWidth);
+  world.height(window.innerHeight);
+});
+</script>
+</body>
+</html>

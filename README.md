@@ -17,14 +17,18 @@ No accounts, no social graph, no history. One moment, one stranger, the same wea
 - **3-question PAD onboarding** (Pleasure, Arousal, Dominance) grounded in Russell & Mehrabian's (1977) tridimensional emotion model.
 - **3 rounds of instinctive image-pair selection** to fine-tune the P and A axes without making the user label their feeling.
 - **Bucketed image dataset**: 9 buckets = 3×3 grid on initial P×A. Each bucket has 6 pre-labeled images with `(p_delta, a_delta)` tuples.
-- **Vector-based matching**: same Dominance required, smallest Euclidean distance on `(final_P, final_A)`, FIFO tiebreak.
-- **AI-generated opener**: a single warm line from GPT-5-mini, calibrated to the shared emotional vector — placed as the first message the two strangers see.
+- **Vector-based matching**: same Dominance required in Echo mode, opposite Dominance by mutual opt-in in Healing mode; smallest Euclidean distance on `(final_P, final_A)`, FIFO tiebreak.
+- **Echo / Healing match modes**: user picks on the landing page. Echo (default) matches same-D users; Healing matches opposite-D users, but only when *both* sides have explicitly asked for it.
+- **Per-round traceability**: each image pick (round, choice label, `p_delta`, `a_delta`) is written to the sheet alongside the final vector, so the PAD calculation is fully auditable row-by-row.
+- **Mode-aware opener bank**: a deterministic JS opener is generated per match, keyed by `match_mode` × PAD quadrant. Zero external API, zero demo-time failure mode. Can be swapped back to GPT (`gpt-4o-mini` or newer) by replacing one node once a real OpenAI key is available.
+- **3D live-matches globe** (`globe/live-matches.html`, Globe.gl): a standalone display page that visualizes matches as flowing arcs + emotion-colored ripples. Runs a simulator out of the box, or polls the `match-feed` webhook for real pairs.
+- **Demo-safe matching pool**: 12 seeded `demo_*` partners (3 per `mode × D` combo) + a 2-minute cron (`Demo-Reset`) that clears their match state, so a solo booth demo always finds a partner within seconds.
 - **Ephemeral chat** via Google Sheets polling, with a 30-minute re-match cooldown.
 
 ## 3. Demo / User Flow
 
 ```
-Landing page ("Begin now to enter your emotion world")
+Landing page: pick Echo (default) or Healing mode
     ↓
 Q1 — Pleasure        → initial_P ∈ {+0.7, 0, -0.7}
 Q2 — Arousal         → initial_A ∈ {+0.7, 0, -0.7}
@@ -39,13 +43,17 @@ Round 3 — space      → vast vs close
 final_P = initial_P + avg(p_deltas) × 0.5
 final_A = initial_A + avg(a_deltas) × 0.5
     ↓
-POST to n8n "Emotion-Intake" → row written to Google Sheets
+POST /emotion-intake  → 20-column row appended (incl. per-round picks + deltas)
     ↓
-POST to n8n "Emotion-Match"  → smallest-distance partner picked, opener generated
+POST /emotion-match   → polled every 2.5 s until matched
+    │   Echo:    same match_mode + same final_D, closest (P,A), FIFO tiebreak
+    │   Healing: same match_mode + opposite final_D (mutual opt-in)
     ↓
-Chat view: AI opener rendered as partner's first message
-    ↓
-User closes chat OR 30-min zombie release
+Chat view: mode-aware opener rendered as partner's first message
+    ↓                                          ↓
+User closes chat OR 30-min zombie release      Display: /globe polls /match-feed
+    ↓                                              shows arc + ripple for every new pair
+POST /match-end → both rows re-enter the pool
     ↓
 "the moment dissolves. you carry what stayed."
 ```
@@ -53,22 +61,25 @@ User closes chat OR 30-min zombie release
 ## 4. System Architecture
 
 ```
- ┌─────────────┐     HTTPS    ┌──────────┐     Sheets API    ┌──────────────┐
- │  Lovable    │ ───────────▶ │   n8n    │ ────────────────▶ │ Google Sheet │
- │  (React SPA)│ ◀───────────  │ workflows│ ◀────────────────  │ (v_users +   │
- └─────────────┘               │ + GPT-5  │                    │  v_messages) │
-         ▲                     │  -mini   │                    └──────────────┘
-         │                     └──────────┘
-         │  fetch every 2.5 s (chat-poll)
+ ┌─────────────┐     HTTPS     ┌──────────────┐    Sheets API    ┌──────────────┐
+ │  Lovable    │ ────────────▶ │     n8n      │ ───────────────▶ │ Google Sheet │
+ │  (React SPA │ ◀────────────  │  workflows   │ ◀───────────────  │ user_vectors │
+ │  + /globe)  │               │  + cron      │                   │ chat_messages│
+ └─────────────┘               │  + opener JS │                   └──────────────┘
+         ▲                     └──────┬───────┘
+         │                            │
+         │  poll chat every 2.5 s     └──── Demo-Reset cron every 2 min
+         │  poll match every 2.5 s          (clears demo_* match state)
+         │  poll match-feed every 3 s (globe)
          │
-         └── Browser localStorage holds session_id only
+         └── Browser localStorage holds session_id + match_mode only
 ```
 
-- **Frontend (Lovable):** a React/Vite SPA that handles UI, session UUID in localStorage, loading bucket JSONs, and calling n8n webhooks over HTTPS. No backend code.
-- **Backend (n8n):** five webhook-triggered workflows that own all business logic — vector math, matching, AI opener generation, chat message relay, match teardown.
-- **Database (Google Sheets):** two tabs — `user_vectors` (one row per user) and `chat_messages` (one row per message). n8n reads and writes via its built-in Google Sheets node.
-- **LLM (GPT-5-mini):** invoked only inside the `Emotion-Match` workflow, via n8n's built-in ChatGPT node. No external API key in the frontend.
-- **Image dataset:** static Unsplash URLs committed to this repo under `picture-dataset/`, served to the browser from Lovable's `public/` folder. Image metadata (deltas, theme, round) travels with each image.
+- **Frontend (Lovable):** a React/Vite SPA that handles UI, session UUID + match_mode in localStorage, loading bucket JSONs, and calling n8n webhooks over HTTPS. `/globe` route is a standalone display page (no app chrome) that either runs a simulator or polls `match-feed`.
+- **Backend (n8n):** seven workflows that own all business logic — vector math, matching, opener generation, chat message relay, match teardown, live globe feed, and a demo-pool reset cron.
+- **Database (Google Sheets):** two live tabs — `user_vectors` (20 columns, one row per user including per-round picks) and `chat_messages` (5 columns, one row per message). n8n reads/writes via its built-in Google Sheets node, referencing tabs by name (not gid) for safety.
+- **Opener generator:** a JS code node in `Emotion-Match` with a curated bank of 24 openers (2 modes × 4 quadrants × 3 variants). Swappable for GPT-4o-mini the moment a real OpenAI key is wired in.
+- **Image dataset:** static Unsplash URLs committed to this repo under `picture-dataset/`, served to the browser from Lovable's `public/` folder. Image metadata (deltas, theme, round) travels with each image and is echoed back to the sheet per user.
 
 ## 5. Emotion Modeling
 
@@ -97,7 +108,9 @@ For a new user submitting their vector, the `Emotion-Match` n8n workflow:
 1. **Reads** all rows of `user_vectors` from Google Sheets.
 2. **Filters** to eligible candidates:
    - not the same `session_id`
-   - same `final_D` (same dominance mode)
+   - candidate's stored `match_mode` equals requester's `match_mode` (mutual opt-in)
+   - in `echo` mode: `final_D` equal to requester's `final_D`
+   - in `healing` mode: `final_D` **opposite** to requester's `final_D`
    - AND one of:
      - `matched_user_id` is empty (never matched), OR
      - `match_ended_at` is set (partner left), OR
@@ -106,10 +119,14 @@ For a new user submitting their vector, the `Emotion-Match` n8n workflow:
    `d = sqrt((P1-P2)² + (A1-A2)²)`
 4. **Ranks** smallest-first, tiebroken by earliest `timestamp` (FIFO — the user who has been waiting longest wins).
 5. **Atomically updates** both rows with `matched_user_id`, `match_timestamp`, and clears `match_ended_at`.
-6. **Calls GPT-5-mini** (via the built-in n8n OpenAI node) with both vectors as context, asking for a single warm opener under 20 words.
-7. **Returns** `{ matched: true, partner_session_id, match_pair_id, opener, match_timestamp }` to the frontend.
+6. **Generates a mode-aware opener** in a JS code node. The bank is keyed by `match_mode` × emotional quadrant (joy / calm / anxious / melancholy), picking one of three variants per cell. *Echo* openers land inside the shared quadrant; *Healing* openers gently acknowledge the listener/talker complementarity without naming the mechanic.
+7. **Returns** `{ matched: true, partner_session_id, match_pair_id, opener, match_timestamp, match_mode }` to the frontend.
 
-If no eligible candidate exists, returns `{ matched: false, message: "you are the first one here right now. please wait." }`. The frontend retries every 3 s.
+If no eligible candidate exists, returns `{ matched: false, match_mode, message }`. The message has two variants:
+- echo: `"you are the first one here right now. please wait."`
+- healing: `"no one has opened themselves to a healing meeting yet. stay a moment."`
+
+The frontend polls every 2.5 s until matched.
 
 ## 7. How n8n Is Used
 
@@ -119,11 +136,13 @@ n8n is the full backend. No custom server code — every piece of business logic
 
 | Workflow | Trigger | What it does |
 | -------- | ------- | ------------ |
-| `emotion-intake` | POST webhook | Validate + compute PAD vector server-side, append to `user_vectors` tab. |
-| `emotion-match`  | POST webhook | Read sheet → filter eligibility → rank by distance → atomic dual update → call GPT-5-mini for opener → respond. |
-| `chat-send`      | POST webhook | Append a message to the `chat_messages` tab. |
-| `chat-poll`      | GET webhook  | Return messages for a `match_pair_id` newer than `since`. Lovable polls every 2.5 s. |
-| `match-end`      | POST webhook | Stamp `match_ended_at` on both rows so they re-enter the pool. |
+| `Emotion-Intake` | POST `/webhook/emotion-intake` | Accepts either `selections: [{round, choice, p_delta, a_delta}]` (preferred) or legacy `p_deltas`/`a_deltas` arrays. Computes PAD vector server-side, normalizes `match_mode`, appends a 20-column row to `user_vectors`. |
+| `Emotion-Match`  | POST `/webhook/emotion-match` | Read sheet → filter eligibility (mutual mode opt-in + D rule per mode) → rank by distance → atomic dual update → pick a curated opener by `match_mode × quadrant` → respond. |
+| `Chat-Send`      | POST `/webhook/chat-send` | Append a message to `chat_messages` using the sheet's original PascalCase headers (`Message Id`, `Match Pair Id`, `From Session Id`, `Text`, `Timestamp`). Webhook response stays snake_case. |
+| `Chat-Poll`      | GET `/webhook/chat-poll` | Return messages for a `match_pair_id` newer than `since`. Re-keys PascalCase sheet headers to snake_case in the response so the frontend contract is stable. |
+| `Match-End`      | POST `/webhook/match-end` | Stamp `match_ended_at` on both rows so they re-enter the pool. |
+| `Match-Feed`     | GET `/webhook/match-feed` | Reads `user_vectors`, deduplicates matched pairs, deterministically assigns each `session_id` to one of ~22 hub cities (Copenhagen weighted 2× for the booth), returns `{ matches: [{from, to, mode, final_P, final_A, intensity, timestamp, match_pair_id}, ...] }` for the globe. Accepts `?since=<iso>&limit=<n>`. |
+| `Demo-Reset`     | cron, every 2 min | Reads `user_vectors`, finds rows whose `session_id` starts with `demo_` and has a non-empty `matched_user_id` or `match_ended_at`, clears those three match fields so the seeded demo partners are always available. |
 
 ### Why n8n is powerful here
 
@@ -158,30 +177,44 @@ Lovable is the full frontend. No hand-written React scaffolding, no manual route
 
 Google Sheets is our database. Two tabs in one sheet, `resonance-users`:
 
-### `user_vectors`
+### `user_vectors` (20 columns)
 
-| Column            | Type         | Notes |
-| ----------------- | ------------ | ----- |
-| `session_id`      | string (UUID) | Browser-generated, stored in localStorage |
-| `timestamp`       | ISO 8601     | Row creation time |
-| `initial_P`       | number       | From Q1 |
-| `initial_A`       | number       | From Q2 |
-| `final_P`         | number       | After image rounds |
-| `final_A`         | number       | After image rounds |
-| `final_D`         | number       | 0 or 1 from Q3, never changes |
-| `matched_user_id` | string / "" | Partner's `session_id`, or empty |
-| `match_timestamp` | ISO 8601 / "" | When the match was made |
-| `match_ended_at`  | ISO 8601 / "" | When either party left the chat |
+| # | Column | Type | Notes |
+|---|--------|------|-------|
+| A | `session_id`      | string (UUID) | Browser-generated, stored in localStorage. Rows starting with `demo_` are seeded demo partners, reset every 2 min. |
+| B | `timestamp`       | ISO 8601     | Row creation time |
+| C | `initial_P`       | number       | From Q1 ∈ {+0.7, 0, −0.7} |
+| D | `initial_A`       | number       | From Q2 ∈ {+0.7, 0, −0.7} |
+| E | `final_P`         | number       | `initial_P + avg(round[1..3].p_delta) × 0.5` |
+| F | `final_A`         | number       | `initial_A + avg(round[1..3].a_delta) × 0.5` |
+| G | `final_D`         | number       | 0 or 1 from Q3, never changes |
+| H | `match_mode`      | string       | `echo` (default) or `healing` — chosen on landing page, frozen for the session |
+| I | `matched_user_id` | string / "" | Partner's `session_id`, or empty |
+| J | `match_timestamp` | ISO 8601 / "" | When the match was made |
+| K | `match_ended_at`  | ISO 8601 / "" | When either party left the chat |
+| L | `round1_choice`   | string       | `"warm"` / `"cold"` (color round) |
+| M | `round1_p_delta`  | number       | Per-image constant from the delta rubric |
+| N | `round1_a_delta`  | number       | Per-image constant from the delta rubric |
+| O | `round2_choice`   | string       | `"sunny"` / `"stormy"` (nature round) |
+| P | `round2_p_delta`  | number       | |
+| Q | `round2_a_delta`  | number       | |
+| R | `round3_choice`   | string       | `"vast"` / `"close"` (space round) |
+| S | `round3_p_delta`  | number       | |
+| T | `round3_a_delta`  | number       | |
 
-### `chat_messages`
+Columns L–T make the final-vector calculation auditable: given the `initial_*` and three `*_delta` values, the `final_*` in columns E/F should reconcile exactly.
 
-| Column            | Type         | Notes |
-| ----------------- | ------------ | ----- |
-| `message_id`      | string (UUID) | Deduplication key for the frontend |
-| `match_pair_id`   | string       | Deterministic `[id_a, id_b].sort().join('__')` |
-| `from_session_id` | string       | Who sent it |
-| `text`            | string       | Up to 1000 chars |
-| `timestamp`       | ISO 8601     | Send time |
+### `chat_messages` (PascalCase headers in-sheet, snake_case in webhook response)
+
+| Column in sheet | Webhook key | Notes |
+| --------------- | ----------- | ----- |
+| `Message Id`      | `message_id`      | Deduplication key for the frontend |
+| `Match Pair Id`   | `match_pair_id`   | Deterministic `[id_a, id_b].sort().join('__')` |
+| `From Session Id` | `from_session_id` | Who sent it |
+| `Text`            | `text`            | Up to 1000 chars |
+| `Timestamp`       | `timestamp`       | Send time |
+
+Chat-Send writes to the sheet using the PascalCase keys (matching the original column names); Chat-Poll re-keys them to snake_case before responding, so the Lovable frontend contract never changes.
 
 ### Why Sheets is fine for v1
 
@@ -195,6 +228,24 @@ Google Sheets is our database. Two tabs in one sheet, `resonance-users`:
 - No atomic transactions — under concurrent matchers, two simultaneous POSTs could both "win" the same candidate. For v1 demo traffic this is acceptable.
 - Polling-based chat (2.5 s) is noticeable latency compared to a realtime DB.
 - Read performance degrades beyond a few thousand rows.
+
+## 9.5. Changelog (v2 — April 2026)
+
+- **Healing match mode** — new landing-page toggle, mutual opt-in, opposite-D eligibility. Plumbed through `Emotion-Intake`, `Emotion-Match`, and the opener bank. Lovable prompt: `lovable-prompts/02b-mode-toggle.md`.
+- **Per-round picks recorded in the sheet** — `user_vectors` expanded from 10 to 20 columns. Each of the three image picks now writes `roundN_choice`, `roundN_p_delta`, `roundN_a_delta`, so `final_P` / `final_A` are verifiable row-by-row.
+- **Mode-aware opener bank** — replaced the `gpt-5-mini` node (the n8n free AI credits proxy returns 404) with a deterministic JS code node that picks from 24 curated lines keyed by `match_mode × quadrant`. One-node swap when a real OpenAI key is wired in.
+- **3D live-matches globe** — standalone `globe/live-matches.html` for the booth display, plus `lovable-prompts/06-globe-display.md` for a `/globe` route inside the Lovable app with a `VITE_DISPLAY_MODE=simulator|live` switch.
+- **`Match-Feed` workflow** — new GET webhook that produces the globe's data feed (deduped pairs, uses real user city/lat/lng when available, deterministic hub fallback otherwise).
+- **`Demo-Reset` cron** — new workflow that runs every 2 minutes and clears match state on all `demo_*` rows. Paired with 12 seeded demo partners (3 per `mode × D` combo) so a solo booth demo always matches within seconds.
+- **`Chat-Timeout` cron** — new workflow that runs every 1 minute, finds matched pairs idle more than 15 minutes (max of `match_timestamp` and latest chat message timestamp) and stamps `match_ended_at` on both rows. Chat-Poll surfaces this via `pair_status`.
+- **Per-user city + coordinates** — `user_vectors` gained three more columns (`city`, `lat`, `lng`). Intake accepts a `city` string and geocodes it against ~90 known cities; optional `lat`/`lng` from browser geolocation override. Match response now carries full `me {city, lat, lng, P, A, D}` and `partner {same}` so the pre-chat reveal screen can draw the real connection on the globe.
+- **LLM geocoder fallback** — unknown city names (non-English scripts, misspellings, abbreviations) are routed through a LangChain Agent + `gpt-5-mini` node inside Emotion-Intake that returns canonical name + lat/lng. Confirmed working on n8n's free AI credits via LangChain.
+- **Recency filter on matching** — real-user candidates in Emotion-Match must have intaked within the last 30 minutes; stale sheet data never matches. `demo_*` seed rows bypass this.
+- **Clean end-of-chat signaling** — Match-End and Chat-Timeout no longer pollute the `chat_messages` text column with `__partner_left__` / `__chat_timeout__` system rows. Both only stamp `match_ended_at`. Chat-Poll now reads `user_vectors` too and returns a top-level `pair_status: 'active' | 'ended'` alongside the messages array.
+- **`Postcard-Generate` workflow** — new POST `/webhook/postcard`. Reads both users and the full chat transcript, asks `gpt-5-mini` for a one-line highlight grounded in the conversation, picks a deterministic background image per pair from the three images the requester chose during the image-rounds, and returns a full shareable payload.
+- **Sheet-integration hardening** — all workflows now reference tabs by name (`user_vectors`, `chat_messages`), not gid, preventing a class of bugs where a wrong gid silently writes to a fake-data tab. `match_mode` header position moved to column H (between `final_D` and `matched_user_id`) via `moveDimension` with zero data loss.
+- **Chat column alignment** — `chat_messages` keeps its original PascalCase headers (`Message Id`, `Match Pair Id`, etc.). `Chat-Send` writes in PascalCase; `Chat-Poll` re-keys to snake_case for the frontend. No more duplicate columns.
+- **Frontend polling fix** — waiting screen polls `/emotion-match` every 2.5 s instead of firing once and stalling. No more "stuck on waiting" when the pool has seeded partners.
 
 ## 10. Future Improvements
 
@@ -223,18 +274,26 @@ Google Sheets is our database. Two tabs in one sheet, `resonance-users`:
 │   ├── bucket_1.json ... bucket_9.json
 ├── n8n-workflows/
 │   ├── README.md              # import + activation steps
-│   ├── emotion-intake.json
-│   ├── emotion-match.json
+│   ├── emotion-intake.json    # intake + per-round picks
+│   ├── emotion-match.json     # echo/healing eligibility + opener bank
 │   ├── chat-send.json
 │   ├── chat-poll.json
-│   └── match-end.json
+│   ├── match-end.json
+│   ├── match-feed.json        # GET feed for the live globe (new)
+│   ├── demo-reset.json        # cron that clears demo_* match state (new)
+│   ├── chat-timeout.json      # cron that auto-ends idle matches (new)
+│   └── postcard-generate.json # POST /postcard — LLM highlight + bg image (new)
 ├── lovable-prompts/
 │   ├── README.md
 │   ├── 01-scaffold.md
 │   ├── 02-questions.md
+│   ├── 02b-mode-toggle.md    # Echo/Healing toggle (new)
 │   ├── 03-image-rounds.md
 │   ├── 04-waiting-and-match.md
-│   └── 05-chat.md
+│   ├── 05-chat.md
+│   └── 06-globe-display.md   # live-matches 3D globe for the demo screen (new)
+├── globe/
+│   └── live-matches.html      # standalone Globe.gl visualization (new)
 ├── docs/
 │   ├── delta-rubric.md        # scoring rationale
 │   └── setup.md               # end-to-end setup checklist
@@ -248,6 +307,7 @@ See [`docs/setup.md`](docs/setup.md) for the full setup checklist.
 
 - Russell, J. A. & Mehrabian, A. (1977). *Evidence for a Three-Factor Theory of Emotions.* Journal of Research in Personality.
 - Images: [Unsplash](https://unsplash.com/license) — free commercial use with attribution. See each image's `photographer_credit`.
-- LLM: GPT-5-mini via n8n's built-in ChatGPT node.
+- Opener generation: curated JS bank inside the `Emotion-Match` n8n workflow (24 lines across `mode × quadrant`). Drop-in replaceable with `gpt-4o-mini` once a real OpenAI key is configured.
+- 3D globe: [Globe.gl](https://globe.gl) via CDN (no build step).
 - Frontend generation: [Lovable](https://lovable.dev).
 - Backend orchestration: [n8n](https://n8n.io).

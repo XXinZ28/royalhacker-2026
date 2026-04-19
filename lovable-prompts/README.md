@@ -6,6 +6,7 @@ Paste these in order into a new Lovable project. Each builds on the previous. Th
 | - | ---- | ----- |
 | 1 | `01-scaffold.md` | Project setup, routes, aesthetic, session UUID |
 | 2 | `02-questions.md` | The three onboarding questions → PAD-initial |
+| 2b | `02b-mode-toggle.md` | Landing-page Echo/Healing mode toggle + payload wiring |
 | 3 | `03-image-rounds.md` | Three image-pair rounds, loads `picture-dataset/bucket_<id>.json`, POSTs intake |
 | 4 | `04-waiting-and-match.md` | Match polling loop |
 | 5 | `05-chat.md` | Chat view (send + poll + end) |

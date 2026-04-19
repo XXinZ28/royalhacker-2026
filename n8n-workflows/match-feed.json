@@ -1,0 +1,95 @@
+{
+  "name": "6-Match-Feed",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "match-feed",
+        "responseMode": "lastNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        304
+      ],
+      "id": "wh",
+      "webhookId": "eac7d4b7-4bed-4610-8067-e32949d9a306"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "user_vectors",
+          "mode": "name",
+          "cachedResultName": "user_vectors"
+        },
+        "options": {}
+      },
+      "name": "Read Users",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        400,
+        304
+      ],
+      "id": "ru",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build a globe feed from user_vectors by finding matched pairs.\n// Uses stored city/lat/lng when available (real users); falls back to\n// a deterministic hub for demo_* rows with no coords.\n\nconst HUBS = [\n  { name: 'Copenhagen', lat: 55.6761, lng:  12.5683 },\n  { name: 'Stockholm',  lat: 59.3293, lng:  18.0686 },\n  { name: 'Berlin',     lat: 52.5200, lng:  13.4050 },\n  { name: 'London',     lat: 51.5074, lng:  -0.1278 },\n  { name: 'Paris',      lat: 48.8566, lng:   2.3522 },\n  { name: 'Amsterdam',  lat: 52.3676, lng:   4.9041 },\n  { name: 'New York',   lat: 40.7128, lng: -74.0060 },\n  { name: 'Los Angeles',lat: 34.0522, lng:-118.2437 },\n  { name: 'Sao Paulo',  lat:-23.5505, lng: -46.6333 },\n  { name: 'Tokyo',      lat: 35.6762, lng: 139.6503 },\n  { name: 'Seoul',      lat: 37.5665, lng: 126.9780 },\n  { name: 'Shanghai',   lat: 31.2304, lng: 121.4737 },\n  { name: 'Singapore',  lat:  1.3521, lng: 103.8198 },\n  { name: 'Sydney',     lat:-33.8688, lng: 151.2093 },\n  { name: 'Mumbai',     lat: 19.0760, lng:  72.8777 },\n  { name: 'Nairobi',    lat: -1.2921, lng:  36.8219 },\n  { name: 'Cairo',      lat: 30.0444, lng:  31.2357 }\n];\nfunction djb2(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h)+s.charCodeAt(i);return h>>>0;}\nfunction hubFor(sid){\n  const biasList=[0,0].concat(HUBS.map((_,i)=>i));\n  const idx=biasList[djb2(String(sid))%biasList.length];\n  const c=HUBS[idx];\n  const jitter=(v,spread)=>v+(((djb2(String(sid)+'_'+spread)%1000)/1000-0.5)*spread);\n  return { name:c.name, lat:+jitter(c.lat,3).toFixed(4), lng:+jitter(c.lng,3).toFixed(4) };\n}\nfunction placeFor(r) {\n  const lat=Number(r.lat), lng=Number(r.lng);\n  if (Number.isFinite(lat) && Number.isFinite(lng) && !(lat===0 && lng===0)) {\n    return { name: String(r.city || '').trim() || 'unknown', lat:+lat.toFixed(4), lng:+lng.toFixed(4) };\n  }\n  return hubFor(r.session_id);\n}\n\nconst q = $('Webhook').first().json.query || {};\nconst sinceMs = q.since ? Date.parse(q.since) : 0;\nconst limit = Math.max(1, Math.min(200, Number(q.limit) || 50));\n\nconst rows = $input.all().map(i => i.json);\nconst bySid = new Map();\nfor (const r of rows) {\n  const sid = String(r.session_id || '').trim();\n  if (sid) bySid.set(sid, r);\n}\n\nconst seenPair = new Set();\nconst matches = [];\nfor (const r of rows) {\n  const sid = String(r.session_id || '').trim();\n  const partnerSid = String(r.matched_user_id || '').trim();\n  if (!sid || !partnerSid) continue;\n  const mt = r.match_timestamp ? Date.parse(r.match_timestamp) : 0;\n  if (!mt) continue;\n  if (mt <= sinceMs) continue;\n  const pairKey = [sid, partnerSid].sort().join('__');\n  if (seenPair.has(pairKey)) continue;\n  seenPair.add(pairKey);\n\n  const partner = bySid.get(partnerSid);\n  if (!partner) continue;\n\n  const from = placeFor(r);\n  const to   = placeFor(partner);\n  if (from.lat === to.lat && from.lng === to.lng) {\n    to.lng = +(to.lng + 6).toFixed(4);\n  }\n\n  const mode = (String(r.match_mode || 'echo').toLowerCase().trim() === 'healing') ? 'healing' : 'echo';\n  const final_P = Number(r.final_P) || 0;\n  const final_A = Number(r.final_A) || 0;\n  const intensity = +Math.min(1, 0.35 + Math.abs(final_A) * 0.9).toFixed(3);\n\n  matches.push({\n    match_pair_id: pairKey,\n    mode,\n    final_P,\n    final_A,\n    intensity,\n    timestamp: r.match_timestamp,\n    from: { lat: from.lat, lng: from.lng, city: from.name },\n    to:   { lat: to.lat,   lng: to.lng,   city: to.name }\n  });\n}\n\nmatches.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));\nreturn [{ json: { matches: matches.slice(0, limit), count: matches.length, now: new Date().toISOString() } }];\n"
+      },
+      "name": "Build Feed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        304
+      ],
+      "id": "bf",
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Users": {
+      "main": [
+        [
+          {
+            "node": "Build Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

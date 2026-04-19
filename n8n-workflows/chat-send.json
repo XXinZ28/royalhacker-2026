@@ -1,5 +1,5 @@
 {
-  "name": "Chat-Send",
+  "name": "3-Chat-Send",
   "nodes": [
     {
       "parameters": {
@@ -13,17 +13,24 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [200, 300],
-      "id": "chat-send-webhook"
+      "position": [
+        208,
+        304
+      ],
+      "id": "chat-send-webhook",
+      "webhookId": "cf7d62bf-c54f-4a73-9fee-4e54a0985223"
     },
     {
       "parameters": {
-        "jsCode": "const b = $input.first().json.body || $input.first().json;\nconst match_pair_id = String(b.match_pair_id || '').trim();\nconst from_session_id = String(b.from_session_id || '').trim();\nconst text = String(b.text || '').trim();\nif (!match_pair_id || !from_session_id || !text) {\n  throw new Error('match_pair_id, from_session_id, text all required');\n}\nreturn [{ json: {\n  message_id: crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2, 10)),\n  match_pair_id,\n  from_session_id,\n  text: text.slice(0, 1000),\n  timestamp: new Date().toISOString()\n} }];"
+        "jsCode": "const b = $input.first().json.body || $input.first().json;\nconst match_pair_id = String(b.match_pair_id || '').trim();\nconst from_session_id = String(b.from_session_id || '').trim();\nconst text = String(b.text || '').trim();\nif (!match_pair_id || !from_session_id || !text) {\n  throw new Error('match_pair_id, from_session_id, text all required');\n}\nconst message_id = (Date.now() + '-' + Math.random().toString(36).slice(2, 12));\nconst timestamp = new Date().toISOString();\n// Emit keys matching the ORIGINAL chat_messages headers (PascalCase with spaces).\nreturn [{ json: {\n  'Message Id': message_id,\n  'Match Pair Id': match_pair_id,\n  'From Session Id': from_session_id,\n  'Text': text.slice(0, 1000),\n  'Timestamp': timestamp\n} }];\n"
       },
       "name": "Build Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [450, 300],
+      "position": [
+        464,
+        304
+      ],
       "id": "build-row"
     },
     {
@@ -31,52 +38,93 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "={{ $env.GOOGLE_SHEET_ID }}",
-          "mode": "id"
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw/edit",
+          "cachedResultName": "chat_messages"
         },
-        "sheetName": "chat_messages",
+        "sheetName": {
+          "__rl": true,
+          "value": "chat_messages",
+          "mode": "name",
+          "cachedResultName": "chat_messages"
+        },
         "columns": {
           "mappingMode": "autoMapInputData",
-          "matchingColumns": []
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {}
       },
       "name": "Append Message",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [700, 300],
+      "position": [
+        704,
+        304
+      ],
       "id": "append-msg",
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "REPLACE_WITH_SHEETS_CRED_ID",
-          "name": "Google Sheets OAuth2"
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: { ok: true, message_id: $('Build Row').first().json.message_id } }];"
+        "jsCode": "const row = $('Build Row').first().json;\nreturn [{ json: { ok: true, message_id: row['Message Id'] } }];"
       },
       "name": "Respond",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [950, 300],
+      "position": [
+        960,
+        304
+      ],
       "id": "respond"
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "Build Row", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Row": {
-      "main": [[{ "node": "Append Message", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Append Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Append Message": {
-      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
   "settings": {
     "executionOrder": "v1"
-  }
+  },
+  "active": false
 }

@@ -1,5 +1,5 @@
 {
-  "name": "Emotion-Match",
+  "name": "2-Emotion-Match",
   "nodes": [
     {
       "parameters": {
@@ -13,40 +13,56 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [200, 300],
-      "id": "match-webhook"
+      "position": [
+        208,
+        304
+      ],
+      "id": "match-webhook",
+      "webhookId": "5df721a2-479a-4e06-81e9-8b3750aab653"
     },
     {
       "parameters": {
-        "operation": "read",
         "documentId": {
           "__rl": true,
-          "value": "={{ $env.GOOGLE_SHEET_ID }}",
-          "mode": "id"
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw/edit",
+          "cachedResultName": "user_vectors"
         },
-        "sheetName": "user_vectors",
+        "sheetName": {
+          "__rl": true,
+          "value": "user_vectors",
+          "mode": "name",
+          "cachedResultName": "user_vectors"
+        },
         "options": {}
       },
       "name": "Read All Users",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [450, 300],
+      "position": [
+        464,
+        304
+      ],
       "id": "read-users",
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "REPLACE_WITH_SHEETS_CRED_ID",
-          "name": "Google Sheets OAuth2"
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const body = $('Webhook').first().json.body || $('Webhook').first().json;\nconst me = {\n  session_id: String(body.session_id || ''),\n  final_P: Number(body.final_P),\n  final_A: Number(body.final_A),\n  final_D: Number(body.final_D)\n};\n\nif (!me.session_id) throw new Error('session_id required');\n\nconst rows = $input.all().map(i => i.json);\nconst now = Date.now();\nconst THIRTY_MIN = 30 * 60 * 1000;\n\nfunction isEligible(r) {\n  if (String(r.session_id) === me.session_id) return false;\n  if (Number(r.final_D) !== me.final_D) return false;\n  const matched = String(r.matched_user_id || '').trim();\n  const ended = String(r.match_ended_at || '').trim();\n  if (!matched) return true;\n  if (ended) return true;\n  const mt = r.match_timestamp ? Date.parse(r.match_timestamp) : 0;\n  if (mt && (now - mt) > THIRTY_MIN) return true;\n  return false;\n}\n\nconst candidates = rows.filter(isEligible).map(r => ({\n  session_id: String(r.session_id),\n  final_P: Number(r.final_P),\n  final_A: Number(r.final_A),\n  final_D: Number(r.final_D),\n  timestamp: r.timestamp ? Date.parse(r.timestamp) : 0,\n  dist: Math.sqrt(Math.pow(me.final_P - Number(r.final_P), 2) + Math.pow(me.final_A - Number(r.final_A), 2))\n}));\n\ncandidates.sort((x, y) => (x.dist - y.dist) || (x.timestamp - y.timestamp));\n\nconst partner = candidates[0];\nconst match_timestamp = new Date().toISOString();\nconst match_pair_id = partner ? [me.session_id, partner.session_id].sort().join('__') : '';\n\nreturn [{\n  json: {\n    me,\n    partner: partner || null,\n    matched: !!partner,\n    match_timestamp,\n    match_pair_id\n  }\n}];"
+        "jsCode": "const body = $('Webhook').first().json.body || $('Webhook').first().json;\nconst me = {\n  session_id: String(body.session_id || ''),\n  final_P: Number(body.final_P),\n  final_A: Number(body.final_A),\n  final_D: Number(body.final_D),\n  match_mode: (String(body.match_mode || 'echo').toLowerCase().trim() === 'healing') ? 'healing' : 'echo',\n  city: String(body.city || ''),\n  lat: Number(body.lat),\n  lng: Number(body.lng)\n};\nif (!me.session_id) throw new Error('session_id required');\n\nconst rows = $input.all().map(i => i.json);\nconst now = Date.now();\nconst THIRTY_MIN = 30 * 60 * 1000;\nconst FRESH_MS = 30 * 60 * 1000;  // candidates must have INTAKED within last 30 min\n\nfunction isEligible(r) {\n  if (String(r.session_id) === me.session_id) return false;\n\n  // Recency: the candidate row itself must be fresh (last 30 min).\n  // Demo rows bypass this because they're seeded standing partners.\n  const isDemo = String(r.session_id).startsWith('demo_');\n  const ts = r.timestamp ? Date.parse(r.timestamp) : 0;\n  if (!isDemo) {\n    if (!ts) return false;\n    if ((now - ts) > FRESH_MS) return false;\n  }\n\n  const theirMode = (String(r.match_mode || 'echo').toLowerCase().trim() === 'healing') ? 'healing' : 'echo';\n  if (theirMode !== me.match_mode) return false;\n\n  if (me.match_mode === 'healing') {\n    if (Number(r.final_D) === me.final_D) return false;\n  } else {\n    if (Number(r.final_D) !== me.final_D) return false;\n  }\n\n  const matched = String(r.matched_user_id || '').trim();\n  const ended = String(r.match_ended_at || '').trim();\n  if (!matched) return true;\n  if (ended) return true;\n  const mt = r.match_timestamp ? Date.parse(r.match_timestamp) : 0;\n  if (mt && (now - mt) > THIRTY_MIN) return true;\n  return false;\n}\n\nconst candidates = rows.filter(isEligible).map(r => ({\n  session_id: String(r.session_id),\n  final_P: Number(r.final_P),\n  final_A: Number(r.final_A),\n  final_D: Number(r.final_D),\n  match_mode: (String(r.match_mode || 'echo').toLowerCase().trim() === 'healing') ? 'healing' : 'echo',\n  city: String(r.city || ''),\n  lat: Number(r.lat),\n  lng: Number(r.lng),\n  timestamp: r.timestamp ? Date.parse(r.timestamp) : 0,\n  dist: Math.sqrt(Math.pow(me.final_P - Number(r.final_P), 2) + Math.pow(me.final_A - Number(r.final_A), 2))\n}));\n\nconst realCands = candidates.filter(c => !String(c.session_id).startsWith('demo_'));\nconst demoCands = candidates.filter(c =>  String(c.session_id).startsWith('demo_'));\nconst pool = realCands.length > 0 ? realCands : demoCands;\npool.sort((x, y) => (x.dist - y.dist) || (x.timestamp - y.timestamp));\n\nconst partner = pool[0];\nconst match_timestamp = new Date().toISOString();\nconst match_pair_id = partner ? [me.session_id, partner.session_id].sort().join('__') : '';\n\nreturn [{\n  json: {\n    me,\n    partner: partner || null,\n    matched: !!partner,\n    match_timestamp,\n    match_pair_id,\n    match_mode: me.match_mode\n  }\n}];\n"
       },
       "name": "Pick Partner",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [700, 300],
+      "position": [
+        704,
+        304
+      ],
       "id": "pick-partner"
     },
     {
@@ -63,7 +79,10 @@
       "name": "Matched?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [950, 300],
+      "position": [
+        960,
+        304
+      ],
       "id": "if-matched"
     },
     {
@@ -71,13 +90,22 @@
         "operation": "update",
         "documentId": {
           "__rl": true,
-          "value": "={{ $env.GOOGLE_SHEET_ID }}",
-          "mode": "id"
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw/edit",
+          "cachedResultName": "user_vectors"
         },
-        "sheetName": "user_vectors",
+        "sheetName": {
+          "__rl": true,
+          "value": "user_vectors",
+          "mode": "name",
+          "cachedResultName": "user_vectors"
+        },
         "columns": {
           "mappingMode": "defineBelow",
-          "matchingColumns": ["session_id"],
+          "matchingColumns": [
+            "session_id"
+          ],
           "value": {
             "session_id": "={{ $json.me.session_id }}",
             "matched_user_id": "={{ $json.partner.session_id }}",
@@ -90,12 +118,15 @@
       "name": "Update Me",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [1200, 200],
+      "position": [
+        1200,
+        208
+      ],
       "id": "update-me",
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "REPLACE_WITH_SHEETS_CRED_ID",
-          "name": "Google Sheets OAuth2"
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
         }
       }
     },
@@ -104,13 +135,22 @@
         "operation": "update",
         "documentId": {
           "__rl": true,
-          "value": "={{ $env.GOOGLE_SHEET_ID }}",
-          "mode": "id"
+          "value": "1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw",
+          "mode": "id",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Djc56C9eZXAdK3dYPan_9A2kFgKeQ8aruA7QOCXzQjw/edit",
+          "cachedResultName": "user_vectors"
         },
-        "sheetName": "user_vectors",
+        "sheetName": {
+          "__rl": true,
+          "value": "user_vectors",
+          "mode": "name",
+          "cachedResultName": "user_vectors"
+        },
         "columns": {
           "mappingMode": "defineBelow",
-          "matchingColumns": ["session_id"],
+          "matchingColumns": [
+            "session_id"
+          ],
           "value": {
             "session_id": "={{ $json.partner.session_id }}",
             "matched_user_id": "={{ $json.me.session_id }}",
@@ -123,99 +163,127 @@
       "name": "Update Partner",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.4,
-      "position": [1200, 400],
+      "position": [
+        1200,
+        400
+      ],
       "id": "update-partner",
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "REPLACE_WITH_SHEETS_CRED_ID",
-          "name": "Google Sheets OAuth2"
+          "id": "SUPqKuo2j3SCrHcz",
+          "name": "Google Sheets 1"
         }
       }
     },
     {
       "parameters": {
-        "model": "gpt-5-mini",
-        "messages": {
-          "values": [
-            {
-              "role": "system",
-              "content": "You generate a single short opener line for two strangers matched in an anonymous 15-minute chat based on their emotional vectors.\n\nRules:\n- 1 sentence, under 20 words.\n- Lowercase. Warm but not performative. No emojis.\n- Don't name emotions. Don't mention the app.\n- The opener should land in the emotional quadrant both users share."
-            },
-            {
-              "role": "user",
-              "content": "User A: P={{ $json.me.final_P }}, A={{ $json.me.final_A }}, D={{ $json.me.final_D }}\nUser B: P={{ $json.partner.final_P }}, A={{ $json.partner.final_A }}, D={{ $json.partner.final_D }}\n\nWrite one opener line."
-            }
-          ]
-        },
-        "options": {
-          "temperature": 0.8,
-          "maxTokens": 60
-        }
+        "jsCode": "const match = $('Pick Partner').first().json;\nconst me = match.me || {};\nconst you = match.partner || {};\nconst mode = match.match_mode || 'echo';\n\nfunction quadrant(P, A) {\n  const p = Number(P), a = Number(A);\n  if (p >= 0 && a >= 0) return 'joy';\n  if (p >= 0 && a < 0)  return 'calm';\n  if (p < 0  && a >= 0) return 'anxious';\n  return 'melancholy';\n}\n\nconst q = quadrant(me.final_P, me.final_A);\n\nconst bank = {\n  echo: {\n    joy:        [\"something in the air tonight, yeah?\",\"feels like a good kind of tired. how's yours?\",\"today was loud in a good way. you?\"],\n    calm:       [\"it's quiet here. how is it where you are?\",\"no rush. just glad we landed in the same place.\",\"soft evening. what does yours sound like?\"],\n    anxious:    [\"my chest has been humming all day. has yours?\",\"rough one, huh. you doing okay?\",\"glad you showed up. what's been loud for you?\"],\n    melancholy: [\"heavy day on my side. you too?\",\"some days just drag. what's yours been like?\",\"tired in the bones kind of tired. you?\"]\n  },\n  healing: {\n    joy:        [\"there's someone listening. tell me about the best thing today.\",\"i'm here with open ears, whatever you'd like to share.\",\"start wherever you want. i'm not going anywhere.\"],\n    calm:       [\"take your time. i'll be here.\",\"no need to warm up. start from the middle if you want.\",\"i'm listening. what's been sitting with you?\"],\n    anxious:    [\"you can set it down here, if you want. i'm just here.\",\"whatever's been loud today, say it out loud. i'm listening.\",\"no pressure to make sense. i'll follow.\"],\n    melancholy: [\"i'm here. however slow is fine.\",\"you don't have to explain. just start somewhere.\",\"tell me what today felt like. i'll stay.\"]\n  }\n};\n\nconst pool = (bank[mode] && bank[mode][q]) || bank.echo.calm;\nconst opener = pool[Math.floor(Math.random() * pool.length)];\n\nreturn [{ json: {\n  matched: true,\n  partner_session_id: you.session_id,\n  match_timestamp: match.match_timestamp,\n  match_pair_id: match.match_pair_id,\n  match_mode: mode,\n  opener,\n  me:      { city: me.city || '',  lat: me.lat  || null, lng: me.lng  || null, final_P: me.final_P,  final_A: me.final_A,  final_D: me.final_D },\n  partner: { city: you.city || '', lat: you.lat || null, lng: you.lng || null, final_P: you.final_P, final_A: you.final_A, final_D: you.final_D }\n} }];\n"
       },
       "name": "Generate Opener",
-      "type": "n8n-nodes-base.openAi",
-      "typeVersion": 1.5,
-      "position": [1450, 300],
-      "id": "gen-opener",
-      "credentials": {
-        "openAiApi": {
-          "id": "TCLXIBfS0vNSGyPJ",
-          "name": "n8n free OpenAI API credits"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const match = $('Pick Partner').first().json;\nconst raw = $input.first().json;\nconst opener = raw.message?.content || raw.choices?.[0]?.message?.content || raw.text || 'hi. glad you\\'re here.';\n\nreturn [{ json: {\n  matched: true,\n  partner_session_id: match.partner.session_id,\n  match_timestamp: match.match_timestamp,\n  match_pair_id: match.match_pair_id,\n  opener: opener.trim()\n} }];"
-      },
-      "name": "Format Matched Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1700, 300],
-      "id": "fmt-matched"
+      "position": [
+        1456,
+        304
+      ],
+      "id": "gen-opener"
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: { matched: false, message: 'you are the first one here right now. please wait.' } }];"
+        "jsCode": "const me = $('Pick Partner').first().json.me || {};\nconst mode = me.match_mode || 'echo';\nconst message = mode === 'healing'\n  ? 'no one has opened themselves to a healing meeting yet. stay a moment.'\n  : 'you are the first one here right now. please wait.';\nreturn [{ json: { matched: false, match_mode: mode, message } }];\n"
       },
       "name": "No-Match Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1200, 600],
+      "position": [
+        1200,
+        608
+      ],
       "id": "no-match"
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "Read All Users", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Read All Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read All Users": {
-      "main": [[{ "node": "Pick Partner", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Pick Partner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Pick Partner": {
-      "main": [[{ "node": "Matched?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Matched?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Matched?": {
       "main": [
         [
-          { "node": "Update Me", "type": "main", "index": 0 },
-          { "node": "Update Partner", "type": "main", "index": 0 }
+          {
+            "node": "Update Me",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Partner",
+            "type": "main",
+            "index": 0
+          }
         ],
-        [{ "node": "No-Match Response", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "No-Match Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Update Me": {
-      "main": [[{ "node": "Generate Opener", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Generate Opener",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Update Partner": {
-      "main": [[{ "node": "Generate Opener", "type": "main", "index": 0 }]]
-    },
-    "Generate Opener": {
-      "main": [[{ "node": "Format Matched Response", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Generate Opener",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
   "settings": {
     "executionOrder": "v1"
-  }
+  },
+  "active": false
 }
