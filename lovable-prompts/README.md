@@ -10,6 +10,8 @@ Paste these in order into a new Lovable project. Each builds on the previous. Th
 | 3 | `03-image-rounds.md` | Three image-pair rounds, loads `picture-dataset/bucket_<id>.json`, POSTs intake |
 | 4 | `04-waiting-and-match.md` | Match polling loop |
 | 5 | `05-chat.md` | Chat view (send + poll + end) |
+| 6 | `06-globe-display.md` | Standalone live-match globe display |
+| 7 | `07-ending-transition.md` | White-dwarf supernova transition from chat → postcard |
 
 ## After pasting
 
@@ -20,4 +22,5 @@ Paste these in order into a new Lovable project. Each builds on the previous. Th
    - `VITE_N8N_CHAT_SEND_URL`
    - `VITE_N8N_CHAT_POLL_URL`
    - `VITE_N8N_MATCH_END_URL`
+   - `VITE_N8N_POSTCARD_URL` (for the ending transition → postcard reveal)
 3. Deploy. Test end-to-end from two different browsers to verify matching.
